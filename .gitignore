@@ -1,6 +1,7 @@
 
 __pycache__/
-*.py[cod]   
+*.py[cod]
+node_modules/
 SJtools/copilot/models
 SJtools/data
 SJtools/copilot/targetPredictor/data/
