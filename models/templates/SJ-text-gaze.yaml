@@ -2,7 +2,7 @@ signals:
   timer_tick_time_ns:
     shape: 1
     dtype: int64
-    
+
   decoded_pos:
     shape: 2
     dtype: float32
@@ -10,7 +10,7 @@ signals:
   target_pos:
     shape: 2
     dtype: float32
-    
+
   target_size:
     shape: 2
     dtype: float32
@@ -22,17 +22,17 @@ signals:
   game_state:
     shape: 1 # use "shape: ()"?
     dtype: int8
-  
+
   # warning: this is a bipartite buffer.
   # indexing starts at ().shape[0] // 2
   eegbuffersignal:
-    shape: (10000, 66)
+    shape: (1250, 17)
     dtype: float32
-  
+
   databuffer:
-    shape: (10000, 66)
+    shape: (1250, 17)
     dtype: float32
-  
+
   # Index within eegbuffersignal to put new data,
   # NOT position of most recent data. Subtract 1 for most recent
   # Should never be less than half of eegbuffersignal.shape[0]
@@ -40,20 +40,20 @@ signals:
   eegbufferindex:
     shape: 1
     dtype: int16
-    
+
   v_decoded:
     shape: 2
     dtype: float32
-  
+
   # can be class probabilities or velocity
   decoder_output:
     shape: 5
     dtype: float32
-    
+
   numEEGSamples:
     shape: 1
     dtype: int16
-    
+
   totalValidEEGSamples:
     shape: 1
     dtype: int64
@@ -61,14 +61,14 @@ signals:
   reload:
     shape: 1
     dtype: bool
-  
+
   gaze_buffer:
     shape: (600, 32)
     dtype: float64
   gaze_buffer_idx:
     shape: 1
     dtype: int16
-  
+
   text_pos:
     shape: 2
     dtype: float64
@@ -89,13 +89,13 @@ modules:
       connections:
         local: # connection_name. should only have 1. Not sure why this level is here.
           task: # stream_name
-            IP: '127.0.0.1'
+            serial_port: /dev/ttyUSB0
             PORT: 7701
           eeg:
-            IP: '127.0.0.1'
+            serial_port: /dev/ttyUSB0
             PORT: 7702
           gaze:
-            IP: '127.0.0.1'
+            serial_port: /dev/ttyUSB0
             PORT: 7703
 
   timer:
@@ -110,7 +110,7 @@ modules:
       timer_type: sleep # pygame or sleep
       dt: 20000 # in microseconds.
       verbose: True
-  
+
   recv_gaze_buffer:
     constructor: True
     destructor: True
@@ -136,9 +136,8 @@ modules:
       - totalValidEEGSamples
     trigger: False
     params:
-      IP: '127.0.0.1'
-      PORT: 7779
-  
+      serial_port: /dev/ttyUSB0
+
   filterEEG:
     constructor: True
     destructor: False
@@ -151,7 +150,7 @@ modules:
       - totalValidEEGSamples
     out:
       - databuffer
-      
+
   SJ_text_classification:
     constructor: True
     destructor: True
@@ -176,15 +175,15 @@ modules:
       objScale: 0.001 # 1/1000
       cursorRadius: 0
       cursorVel: [0.015, 0.015] # max is 1 (0~1)
-      styleChange : False
+      styleChange: False
       skipFirstNtrials: 1
       resetCursorPos: True
-      decodedVel:  # max is 1
-        0 : [-1. ,  0]   #   0 : left
-        1 : [ 1. ,  0]   #   1 : right
-        2 : [ 0. ,  1]   #   2 : up
-        3 : [ 0. , -1]   #   3 : down
-        4 : [ 0. ,  0]   #   4 : still
+      decodedVel: # max is 1
+        0: [-1., 0] #   0 : left
+        1: [1., 0] #   1 : right
+        2: [0., 1] #   2 : up
+        3: [0., -1] #   3 : down
+        4: [0., 0] #   4 : still
       graceTimeThres: 0 # seconds
       softmaxThres: 0.0
       activeLength: 20 # seconds
@@ -193,12 +192,12 @@ modules:
       # hideProgressBar: True
       showSoftmax: False
       showCountDown: True
-      yamlName : models/templates/SJ-text-gaze.yaml # ***
+      yamlName: models/templates/SJ-text-gaze.yaml # ***
       previewTimeThres: 0.0 # how long to show preview of next text (between 0 to 1)
       textVelScale: 0.0 # 0.5
-      
-      testedAction:   # max is 1 (pos, size)
-      # Healthy
+
+      testedAction: # max is 1 (pos, size)
+        # Healthy
         - Left Hand
         - Right Hand
         - Both Hands
@@ -221,73 +220,71 @@ modules:
       # - Still
 
       action2state_task: # what number should state task use when it is using target
-        
-        Left Hand : 0
+        Left Hand: 0
         Left Arm: -127
-        left : 0
-        
-        Right Hand : 1
+        left: 0
+
+        Right Hand: 1
         Right Arm: -126
-        right : 1
-        
-        Both Hands : 2
-        Up : 2
-        
-        Down : 3
-        Feet : 3
+        right: 1
 
-        still : 4
-        Still : 4
-        Relax : 4
+        Both Hands: 2
+        Up: 2
 
-        Subtract : 5
-        
-        Sing : 6
+        Down: 3
+        Feet: 3
 
-        Walk : 7
+        still: 4
+        Still: 4
+        Relax: 4
 
+        Subtract: 5
 
-        Foot Left : 8
-        Foot Right : 9
+        Sing: 6
+
+        Walk: 7
+
+        Foot Left: 8
+        Foot Right: 9
 
         Left Fingers: 20
         Right Fingers: 21
         Fingers: 22
 
-        Left x 1 : 101
-        Left x 2 : 102
-        Left x 3 : 103
-        Right x 1 : 104
-        Right x 2 : 105
-        Right x 3 : 106
+        Left x 1: 101
+        Left x 2: 102
+        Left x 3: 103
+        Right x 1: 104
+        Right x 2: 105
+        Right x 3: 106
 
-        Tongue : 107
+        Tongue: 107
         Nodding: 108
-        Butterfly : 109
-        Clap : 110
-        Shake Hand : 111
-        Snap Finger : 112
-        Chewing : 113
-        Stomp Left : 114
-        Stomp Right : 115
-        Left Handshake : 116
-        Right Handshake : 117
-        Tongue in-out : 118
-        Tongue top : 119
+        Butterfly: 109
+        Clap: 110
+        Shake Hand: 111
+        Snap Finger: 112
+        Chewing: 113
+        Stomp Left: 114
+        Stomp Right: 115
+        Left Handshake: 116
+        Right Handshake: 117
+        Tongue in-out: 118
+        Tongue top: 119
         Word Association: 120
         math: 121
 
-        Left Wrist : 122
-        Right Wrist : 123
-        Both Wrist : 124
-        Legs : 125
+        Left Wrist: 122
+        Right Wrist: 123
+        Both Wrist: 124
+        Legs: 125
         Both Legs: 125
-        Left Leg : 126
-        Right Leg : 127
-        Cube Rotation : 128
+        Left Leg: 126
+        Right Leg: 127
+        Cube Rotation: 128
 
-        ~ : -1 # None (when there is no target. [i.e stop] assign some number to state_task = -1)
-  
+        ~: -1 # None (when there is no target. [i.e stop] assign some number to state_task = -1)
+
   logger:
     constructor: True
     destructor: True
@@ -333,11 +330,11 @@ modules:
       connections:
         local:
           task:
-            IP: '127.0.0.1'
+            serial_port: /dev/ttyUSB0
             PORT: 7701
           eeg:
-            IP: '127.0.0.1'
+            serial_port: /dev/ttyUSB0
             PORT: 7702
           gaze:
-            IP: '127.0.0.1'
+            serial_port: /dev/ttyUSB0
             PORT: 7703

@@ -21,10 +21,10 @@ signals:
     shape: 1
     dtype: int8
   eegbuffersignal:
-    shape: (10000, 66)
+    shape: (1250, 17)
     dtype: float32
   databuffer:
-    shape: (10000, 66)
+    shape: (1250, 17)
     dtype: float32
   eegbufferindex:
     shape: 1
@@ -191,7 +191,7 @@ modules:
       connections:
         local:
           task:
-            IP: 127.0.0.1
+            serial_port: /dev/ttyUSB0
             PORT: 7701
   replay_decoder:
     name: replay
@@ -404,6 +404,6 @@ modules:
       connections:
         local:
           task:
-            IP: 127.0.0.1
+            serial_port: /dev/ttyUSB0
             PORT: 7701
 std updated: 5.0

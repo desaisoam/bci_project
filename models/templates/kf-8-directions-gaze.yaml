@@ -6,7 +6,7 @@ signals:
   timer_tick_time_ns:
     shape: 1
     dtype: int64
-  
+
   decoded_pos:
     shape: 2
     dtype: float32
@@ -14,7 +14,7 @@ signals:
   target_pos:
     shape: 2
     dtype: float32
-    
+
   target_size:
     shape: 2
     dtype: float32
@@ -26,17 +26,17 @@ signals:
   game_state:
     shape: 1 # use "shape: ()"?
     dtype: int8
-  
+
   # warning: this is a bipartite buffer.
   # indexing starts at ().shape[0] // 2
   eegbuffersignal:
-    shape: (10000, 66)
+    shape: (1250, 17)
     dtype: float32
-  
+
   databuffer:
-    shape: (10000, 66)
+    shape: (1250, 17)
     dtype: float32
-  
+
   # Index within eegbuffersignal to put new data,
   # NOT position of most recent data. Subtract 1 for most recent
   # Should never be less than half of eegbuffersignal.shape[0]
@@ -44,16 +44,16 @@ signals:
   eegbufferindex:
     shape: 1
     dtype: int16
-    
+
   v_decoded:
     shape: 2
     dtype: float32
-  
+
   # can be class probabilities or velocity
   decoder_output:
     shape: 5
     dtype: float32
-  
+
   # signals needed for decoder_hidden and kf_clda
   kf_state:
     shape: (7,)
@@ -137,11 +137,11 @@ signals:
   numEEGSamples:
     shape: 1
     dtype: int16
-    
+
   totalValidEEGSamples:
     shape: 1
     dtype: int64
-  
+
   # task variables to log
   sessionLength:
     shape: 1
@@ -194,7 +194,7 @@ signals:
   enableKfSyncInternal:
     shape: 1
     dtype: int8
-  
+
   # gaze signals
   gaze_buffer:
     shape: (600, 32)
@@ -215,7 +215,6 @@ group_params:
     params:
       # &dt reference is NECESSARY, otherwise it will be a silent bug in SJ-4-directions/kf-4-directions.
       dt: &dt_ 50000 # in microseconds
-    
 
 modules:
   # WARNING: make sure you have an exit condition when using loop: False
@@ -230,13 +229,13 @@ modules:
       connections:
         local: # connection_name. should only have 1. Not sure why this level is here.
           task: # stream_name
-            IP: '127.0.0.1'
+            IP: "127.0.0.1"
             PORT: 7701
           eeg:
-            IP: '127.0.0.1'
+            IP: "127.0.0.1"
             PORT: 7702
           gaze:
-            IP: '127.0.0.1'
+            IP: "127.0.0.1"
             PORT: 7703
 
   timer:
@@ -278,9 +277,8 @@ modules:
       - totalValidEEGSamples
     trigger: False
     params:
-      IP: '127.0.0.1'
-      PORT: 7779
-  
+      serial_port: /dev/ttyUSB0
+
   filterEEG:
     constructor: True
     destructor: False
@@ -293,7 +291,7 @@ modules:
       - totalValidEEGSamples
     out:
       - databuffer
-      
+
   decoder_hidden:
     constructor: True
     sync:
@@ -318,7 +316,7 @@ modules:
       data_preprocessor:
         online_status: online
         normalizer_type: welfords
-  
+
   kf_clda:
     constructor: True
     destructor: True
@@ -406,14 +404,14 @@ modules:
       syncLength: 300 # seconds
       waitIntegerBlocks: True
       fullScreen: False
-      screenSize: [700,700] # w,h
+      screenSize: [700, 700] # w,h
       objScale: 0.001 # 1/1000
       cursorRadius: 10
       cursorVel: [0.012, 0.012] # max is 1 (0~1)
       ignoreWrongTarget: False
       cursorMoveInCorretDirectionOnly: False
       useRandomTargetPos: False
-      
+
       centerIn: True
       enforceCenter: reset
       resetCursorPos: False
@@ -422,15 +420,14 @@ modules:
       styleChange: True
       styleChangeBallSize: 1.0
       styleChangeCursorSize: [0.1, 0.1]
-      targetWrongColor: [60,60,60]
-      
+      targetWrongColor: [60, 60, 60]
 
       # using cm board
       useCmBoard: False
       cmBoardDetail:
         fullSizeScreen: False
-        gameBoardSize: [20,20] # cm by cm (x,y)
-        actualScreenSize: [33,21] # cm by cm (x,y)
+        gameBoardSize: [20, 20] # cm by cm (x,y)
+        actualScreenSize: [33, 21] # cm by cm (x,y)
       useCircleTargets: True
       # targetsInfo:  # max is 1 (pos, size)
       #   left : [[-0.8, 0  ], [0.6, 0.6]]   #   0 : left, #8cm away 6by6cm
@@ -441,35 +438,35 @@ modules:
       #   LD : [[ -0.5657, -0.5657], [0.6, 0.6]]   #   1 : right,
       #   RU : [[ 0.5657, 0.5657], [0.6, 0.6]]   #   2 : up,
       #   RD : [[ 0.5657,-0.5657], [0.6, 0.6]]   #   3 : down,
-      targetsInfo:  # max is 1 (pos, size)
-        left : [[-0.7, 0  ], [0.6, 0.6]]   #   0 : left, #8cm away 6by6cm
-        right: [[ 0.7, 0  ], [0.6, 0.6]]   #   1 : right,
-        up   : [[ 0  , 0.7], [0.6, 0.6]]   #   2 : up,
-        down : [[ 0  ,-0.7], [0.6, 0.6]]   #   3 : down,
-        LU : [[ -0.4950, 0.4950], [0.6, 0.6]]   #   0 : left,
-        LD : [[ -0.4950, -0.4950], [0.6, 0.6]]   #   1 : right,
-        RU : [[ 0.4950, 0.4950], [0.6, 0.6]]   #   2 : up,
-        RD : [[ 0.4950,-0.4950], [0.6, 0.6]]   #   3 : down,
+      targetsInfo: # max is 1 (pos, size)
+        left: [[-0.7, 0], [0.6, 0.6]] #   0 : left, #8cm away 6by6cm
+        right: [[0.7, 0], [0.6, 0.6]] #   1 : right,
+        up: [[0, 0.7], [0.6, 0.6]] #   2 : up,
+        down: [[0, -0.7], [0.6, 0.6]] #   3 : down,
+        LU: [[-0.4950, 0.4950], [0.6, 0.6]] #   0 : left,
+        LD: [[-0.4950, -0.4950], [0.6, 0.6]] #   1 : right,
+        RU: [[0.4950, 0.4950], [0.6, 0.6]] #   2 : up,
+        RD: [[0.4950, -0.4950], [0.6, 0.6]] #   3 : down,
         # still : "still"                       #   4 : still state (not stop state)
       defaultTargetSize: [0.6, 0.6]
 
       target2state_task: # what number should state task use when it is using target
-        left : 0
+        left: 0
         right: 1
-        up   : 2
-        down : 3
-        still : 4
+        up: 2
+        down: 3
+        still: 4
         LU: 5
         LD: 6
         RU: 7
         RD: 8
-        ~ : -1 # None (when there is no target. [i.e stop] assign some number to state_task = -1)
-      decodedVel:  # max is 1
-        0 : [-1. ,  0]   #   0 : left
-        1 : [ 1. ,  0]   #   1 : right
-        2 : [ 0. ,  1]   #   2 : up
-        3 : [ 0. , -1]   #   3 : down
-        4 : [ 0. ,  0]   #   4 : still
+        ~: -1 # None (when there is no target. [i.e stop] assign some number to state_task = -1)
+      decodedVel: # max is 1
+        0: [-1., 0] #   0 : left
+        1: [1., 0] #   1 : right
+        2: [0., 1] #   2 : up
+        3: [0., -1] #   3 : down
+        4: [0., 0] #   4 : still
       holdTimeThres: 0.5 # seconds
       graceTimeThres: 0.0 # seconds
       softmaxThres: 0.5
@@ -483,7 +480,7 @@ modules:
       numInitialEvaluationBlocks: 1 # number of blocks until sync is allowed. no sync during calibration.
       showTextMetrics: ~ # 'b' for bitrate, 'a' for accuracy, else shows default
       showCountDown: True
-      softmaxStyle : normal
+      softmaxStyle: normal
       showSoftmax: False
       showHeatmap: False
       showStats: False
@@ -492,10 +489,10 @@ modules:
       showAllTarget: False
       hideCom: True
       hideMass: True
-      yamlName : models/kf-8-directions-gaze.yaml
+      yamlName: models/kf-8-directions-gaze.yaml
       #copilot_path : SJtools/copilot/models/keep/now-pou33z92l0/best_model #11-09 unpeaky softmax, center-out-8
       copilot_kf_state: True
-      kfCopilotAlpha : 1.0 # 1: kf, 0: copilot 
+      kfCopilotAlpha: 1.0 # 1: kf, 0: copilot
       enableKfSync: True # enables Kf to sync every trial
       enableKfAdapt: True # enables Kf to adapt every tick
       enableKfAdaptDelay: 1.0 # 1 second delay until Kf starts adapting every trial
@@ -621,12 +618,12 @@ modules:
       connections:
         local:
           task:
-            IP: '127.0.0.1'
+            IP: "127.0.0.1"
             PORT: 7701
           eeg:
-            IP: '127.0.0.1'
+            IP: "127.0.0.1"
             PORT: 7702
           gaze:
-            IP: '127.0.0.1'
+            IP: "127.0.0.1"
             PORT: 7703
 std updated: 5.0

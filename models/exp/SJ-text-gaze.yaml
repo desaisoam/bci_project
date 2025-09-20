@@ -18,10 +18,10 @@ signals:
     shape: 1
     dtype: int8
   eegbuffersignal:
-    shape: (10000, 66)
+    shape: (1250, 17)
     dtype: float32
   databuffer:
-    shape: (10000, 66)
+    shape: (1250, 17)
     dtype: float32
   eegbufferindex:
     shape: 1
@@ -63,13 +63,13 @@ modules:
       connections:
         local:
           task:
-            IP: 127.0.0.1
+            serial_port: /dev/ttyUSB0
             PORT: 7701
           eeg:
-            IP: 127.0.0.1
+            serial_port: /dev/ttyUSB0
             PORT: 7702
           gaze:
-            IP: 127.0.0.1
+            serial_port: /dev/ttyUSB0
             PORT: 7703
   timer:
     constructor: true
@@ -107,8 +107,7 @@ modules:
       - totalValidEEGSamples
     trigger: false
     params:
-      IP: 127.0.0.1
-      PORT: 7779
+      serial_port: /dev/ttyUSB0
   filterEEG:
     constructor: true
     destructor: false
@@ -276,11 +275,11 @@ modules:
       connections:
         local:
           task:
-            IP: 127.0.0.1
+            serial_port: /dev/ttyUSB0
             PORT: 7701
           eeg:
-            IP: 127.0.0.1
+            serial_port: /dev/ttyUSB0
             PORT: 7702
           gaze:
-            IP: 127.0.0.1
+            serial_port: /dev/ttyUSB0
             PORT: 7703
