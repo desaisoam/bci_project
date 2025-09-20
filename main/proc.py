@@ -23,7 +23,7 @@ def proc(signals, module, p_in: list, p_out: list, trigger=None, log_queue=None,
     # log_queue mp.Queue object to add print output to.
     # timeout: time to wait for upstream messages for the first&second loop. Needs to be longer than expected dt.
     # loop_timeout: time to wait for upstream messages for subsequent loops. Needs to be longer than expected dt.
-    
+
     data_folder = module['params']['data_folder']
     if log_queue is not None and platform.system() == 'Windows': # for Windows only. Due to fork/spawn differences
         log_filename = data_folder + 'logfile.log'
@@ -45,16 +45,16 @@ def proc(signals, module, p_in: list, p_out: list, trigger=None, log_queue=None,
                 #you might want to specify some extra behavior here.
                 pass
         sys.stdout = Logger()
-    
+
     print('  starting {}'.format(module['name']))
-    
+
     d_ = {} # Namespace dictionary containing all the objects created and used
     m_shm = util.shm_setup(signals, module) # Shared memory setup
     for key, value in m_shm.items():
         if key[0] != '_':
             d_[key] = value # Assign numpy arrays to namespace d_
     d_['params'] = module['params'] if ('params' in module) else {}
-    
+
     # Compile the code blocks in reverse order to ensure the loop and destructor and valid before running the constructor.
     destructor = None
     if 'destructor' in module: # Get destructor (if required) for future execution
@@ -80,8 +80,8 @@ def proc(signals, module, p_in: list, p_out: list, trigger=None, log_queue=None,
                     print(util.color_str(str(e), (255, 0, 0)))
                     raise
                 print('after constructor ' + module['name'])
-    
-    
+
+
     # Receive the trigger signal from main before signal (if applicable)
     msg = ''
     if trigger is not None:
@@ -89,10 +89,10 @@ def proc(signals, module, p_in: list, p_out: list, trigger=None, log_queue=None,
             pass # return?
         else:
             msg = trigger.recv()
-    
+
     i = 0 # Counter of no. of loops completed. Empty cycles count as a loop
     cycle = module['cycle'] if 'cycle' in module else 1 # Number of cycles to wait from upstream modules for each execution.
-                                                        # 1 means execute on every cycle. 
+                                                        # 1 means execute on every cycle.
                                                         # Caution: Any value other than 1 probably messes with timing.
     print('before loop', module['name']) # Just to keep track of where we are in execution.
     if use_loop:
@@ -153,7 +153,7 @@ def proc(signals, module, p_in: list, p_out: list, trigger=None, log_queue=None,
                 if trigger is not None:
                     trigger.send('quit_')
                 break
-    
+
     # Execute the destructor (if applicable)
     if destructor is not None:
         print('    Destructing {}\n'.format(module['name']), end='')
@@ -165,6 +165,6 @@ def proc(signals, module, p_in: list, p_out: list, trigger=None, log_queue=None,
     for key, value in m_shm.items():
         if key[0] == '_':
             m_shm[key].close() # Close this process's access to shared memory
-    
+
     print('  Exiting {}\n'.format(module['name']), end='') # Print a status update.
     return
