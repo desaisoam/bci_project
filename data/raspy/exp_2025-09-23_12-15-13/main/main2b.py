@@ -16,11 +16,14 @@ try:
     from yaml import CLoader as Loader, CDumper as Dumper
 except ImportError:
     from yaml import Loader, Dumper
+
+# Add parent directory to path.
+# Useful for importing things.
 raspy_dir = os.path.dirname( os.path.dirname( os.path.abspath(__file__) ) )
 sys.path.append( raspy_dir )
 
-import proc
-import util
+import proc2b as proc
+import util2b as util
 
 import re
 
@@ -39,7 +42,6 @@ def main():
     period = 0.5 # seconds to sleep polling
 
     parser = argparse.ArgumentParser()
-
     parser.add_argument('model_name', help='Name of YAML file without extension describing the model')
     parser.add_argument('--save', help='whether to save anything at all. WARNING: IF YOUR MODULES DEPEND ON data_folder, e.g. logger_disk, DO NOT SET THIS TO FALSE. Overrides --logfile. Default True.')
     parser.add_argument('--logfile', help='whether to log print output to a logfile. Default True.')
@@ -47,7 +49,6 @@ def main():
     parser.add_argument('--module_args', default='', help='params to pass on to modules as params->commandline_args, or as params->key. Format is --module_args "--global_var1 global_val1 /namespaceA --A_var1 A_val1 --A_var2 A_val2 /namespaceB" --B_var1 B_val1'
                         ' where namespace is the name of the module (the yaml name, which does not correspond to the file name if the name field is specified)')
     parser.add_argument('-overwrite_params', default=False, action='store_true', help='whether to overwrite params in addition to writing to commandline_args')
-
     #models_dir = './models/' # todo?: maybe switch to dynamically allocated path or based on some install
     #modules_dir = './modules/'
     models_dir = raspy_dir + '/models/'
@@ -62,7 +63,6 @@ def main():
     if args.module_args is None:
         raise ValueError('module_args cannot be None!')
 
-
     # opening and loading the model declaration yaml file:
     yaml_name = models_dir + args.model_name + '.yaml'
     yaml_file = open(yaml_name, 'r')
@@ -72,7 +72,7 @@ def main():
     for name in signals:
         signals[name]['shape'] = ast.literal_eval(str(signals[name]['shape'])) # needed to convert tuple from str
     modules = yaml_data['modules']
-
+    
     '''
     # group_params are passed to module['params'] BEFORE commandline_args
     #   but AFTER loading the yaml
@@ -111,7 +111,6 @@ def main():
         save_path = modules['logger_disk']['params']['save_path']
 
 
-
     # Format the data_folder with save_path based on time.
     # Possible change: change name based on model_name or argument
     now = datetime.datetime.now()
@@ -143,18 +142,18 @@ def main():
                 data_folder = data_folder.replace('{counter}', str(max(counter_vals) + 1))
     if data_folder[-1] != '/':
         data_folder = data_folder + '/'
-
+    
     if save_any:
         if not os.path.exists(save_path):
             pathlib.Path(save_path).mkdir(parents=True)
         if not os.path.exists(data_folder):
             pathlib.Path(data_folder).mkdir(parents=True)
-
+    
     log_filename = data_folder + 'logfile.log'
     if use_logfile:
         log_file = open(log_filename, 'w')
         log_file.write(str(sys.argv) + '\n') # write the command line arguments to the logfile
-
+        
         log_queue = mp.Queue(10000) # queue which holds the printed strings to be collected by main.py
         log_list = [] # list which holds the printed strings and is saved to disk at the end to prevent timing violations.
         # Class which captures print output. Writes to terminal and puts to log_queue.
@@ -178,7 +177,7 @@ def main():
         sys.stdout = Logger()
     else:
         log_queue = None
-
+    
     for name in modules:
         if 'params' not in modules[name]:
             modules[name]['params'] = {}
@@ -231,11 +230,10 @@ def main():
         dest_yaml_path = data_folder + 'models/' + args.model_name + '.yaml'
         os.makedirs(os.path.dirname( os.path.abspath(dest_yaml_path) ), exist_ok=True)
         shutil.copyfile(yaml_name, dest_yaml_path)
-        shutil.copyfile(yaml_name, data_folder + 'models/' + args.model_name + '.yaml')
         os.mkdir(data_folder + 'main/')
-        shutil.copyfile(raspy_dir + '/main/main.py', data_folder + '/main/main.py')
-        shutil.copyfile(raspy_dir + '/main/proc.py', data_folder + '/main/proc.py')
-        shutil.copyfile(raspy_dir + '/main/util.py', data_folder + '/main/util.py')
+        shutil.copyfile(raspy_dir + '/main/main2.py', data_folder + '/main/main2.py')
+        shutil.copyfile(raspy_dir + '/main/proc2.py', data_folder + '/main/proc2.py')
+        shutil.copyfile(raspy_dir + '/main/util2.py', data_folder + '/main/util2.py')
         shutil.copyfile(raspy_dir + '/__init__.py', data_folder + '/__init__.py')
         os.mkdir(data_folder + 'modules/')
         for name in modules:
@@ -250,7 +248,7 @@ def main():
             if 'destructor' in module and module['destructor']:
                 shutil.copyfile(modules_dir + name + '_destructor.py', data_folder + \
                                 'modules/' + name + '_destructor.py')
-
+    
         paths_to_copy = yaml_data['paths_to_copy'] if 'paths_to_copy' in yaml_data else [] # a list of relative paths (files or dirs) to copy
         for path_name in paths_to_copy:
             if path_name[0] == '.' or '..' in path_name:
@@ -261,18 +259,13 @@ def main():
             else:
                 print(util.color_str(f'Path is not relative or path references a parent directory! Skipping {path_name}', (255, 0, 0)))
             pass
-
-    # Create all shared memory buffers for signals:
-    shm_dict = {}
-    for name, signal in signals.items():
-        nbytes = int(np.prod(signal['shape'])*np.dtype(signal['dtype']).itemsize)
-        try:
-            shm_dict[name] = mp.shared_memory.SharedMemory(name=name, create=True, size=nbytes)
-        except:
-            tmp = mp.shared_memory.SharedMemory(name=name, create=False, size=nbytes)
-            tmp.unlink()
-            shm_dict[name] = mp.shared_memory.SharedMemory(name=name, create=True, size=nbytes)
-
+    
+    # Create all shared memory buffers for signals within a manager:
+    #   This helps make sure all shared memory gets shut down.
+    pid = os.getpid()
+    shared_memory_manager = util.RaspySharedMemoryManager(signals)
+    print(f'pid: {pid}\n', end='')
+    
     # Create communication pipes between processes in the directed graph.
     pipes = {name: {'in': [], 'out': [], 'trigger': None} for name in modules.keys()}
     triggers = {}
@@ -299,9 +292,8 @@ def main():
                 conn1, conn2 = mp.Pipe()
                 pipes[name]['trigger'] = conn1
                 triggers[name] = conn2
-
+    
     def flush_log(lg_queue, lg_list):
-        # move all items from lg_queue to lg_list
         if lg_queue is not None:
             while not lg_queue.empty():
                 line = lg_queue.get()
@@ -313,19 +305,23 @@ def main():
         procs = {}
         for name, module in modules.items():
             procs[name] = mp.Process(target=proc.proc, args=(
-                signals, module, pipes[name]['in'], pipes[name]['out'], pipes[name]['trigger'], log_queue), name=name)
+                signals, module, pipes[name]['in'], pipes[name]['out'], pipes[name]['trigger'], log_queue, shared_memory_manager.shm_names), name=name)
             print('main {}\n'.format(name), end='')
             procs[name].start()
             time.sleep(0.01)
-
+        
         # Send an empty string to trigger each triggered process
         for name, trigger in triggers.items():
             print('trigger {}\n'.format(name), end='')
             try:
                 trigger.send('')
             except:
+                print('failed to send trigger for {}\n.'.format(name), end='')
                 pass # some exit i guess. to-do?
 
+
+        # catch messages from trigger modules.
+        # quit if receiving 'quit_'
         while True:
             try:
                 for name, trigger in triggers.items():
@@ -366,17 +362,14 @@ def main():
                 procs[name].close()
             except ValueError as e:
                 pass
-        # Close shared memory buffers.
-        for key, value in shm_dict.items():
-            shm_dict[key].close()
-            shm_dict[key].unlink()
-
+        
         print('  Exiting main')
         flush_log(log_queue, log_list)
         # Write print output to logfile (if applicable)
         if log_queue is not None:
             for line in log_list:
                 log_file.write(line)
+        del shared_memory_manager
     return
 
 if __name__ == '__main__':

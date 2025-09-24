@@ -20,7 +20,7 @@ decoder_path = decoder_path.parent / decoder_path.stem
 
 # check if model path exists & unzip
 if decoder_path.exists(): pass
-elif decoder_path.with_suffix('.zip').exists(): 
+elif decoder_path.with_suffix('.zip').exists():
     with zipfile.ZipFile(decoder_path.with_suffix('.zip'),"r") as zip_ref:
         zip_ref.extractall(decoder_path.parent)
 else: raise NameError("No such model at", decoder_path)
@@ -37,7 +37,7 @@ model = model.to(device)
 config = read_config(str(Path(decoder_path / "config.yaml")))
 dataPreprocessor = DataPreprocessor(config=deepDictUpdate(config["data_preprocessor"], params["data_preprocessor"]))
 input_length = config['model']['window_length']
-downsampled_length = int(config['model']['sampling_frequency'] * config['model']['window_length'] / 1000)
+downsampled_length = int(config['model']['sampling_frequency'] * config['model']['window_length'] / 125)
 
 # decoder_output will always be 5 length
 decoder_output[:] = np.zeros(decoder_output.shape)

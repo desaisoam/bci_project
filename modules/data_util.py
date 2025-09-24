@@ -17,7 +17,7 @@ def load_data(filename, return_dict=True, copy_arr=False):
             dtypes, shapes = dtypes.split('$')
             dtypes = dtypes.strip()
             shapes = ast.literal_eval(shapes.strip())
-        
+
         labels = labels.split(',')
         dtypes = dtypes.split(',')
         if shapes is None:
@@ -47,7 +47,7 @@ def downsample_data(data, keys=[], downsample=1, start=0, end=None, return_dict=
             keys = data['labels']
         else:
             keys = data.dtype.names
-    
+
     dtype = []
     for key in keys:
         dtype.append((key, data[key].dtype.str, data[key][0].shape))
@@ -96,7 +96,7 @@ def resave_data(data, path, name='', labels=None, as_npy=False):
     if not labels_was_none or isinstance(data, dict):
         vs = list(zip(*[data[label] for label in labels]))
         data = np.array(vs, dtype=dtypes)
-    
+
     if as_npy:
         np.save(path, data)
     else:
@@ -128,7 +128,7 @@ class DataFilter():
         self.btype = btype # 'lowpass', 'highpass', or 'bandpass'
         self.order = order # butterworth filter order, or orders if separate highpass (first) and lowpass (second) filters
         self.fs = fs # sampling frequency
-        
+
         self.sosnotch = [np.concatenate(scipy.signal.iirnotch(fn_i, q_i, fs=fs)).reshape((1, 6)) for fn_i, q_i in zip(fn, q)]
         if fc is None:
             self.sosbutter = np.zeros((0, 6))
@@ -148,7 +148,7 @@ class DataFilter():
                 self.sos = np.vstack([*self.sosnotch, self.soslp, self.soshp])
         else:
             raise ValueError('fc must match btype')
-        
+
         self.zi0 = scipy.signal.sosfilt_zi(self.sos)
         self.zi = None
         return
@@ -185,24 +185,24 @@ def slidingwindow(data, width, stride=1, dilation=1, batch_dim=False):
     if len(data.shape) == 1:
         data = data[:, None]
     windowwidth = (width-1)*dilation+1
-    
+
     if batch_dim:
         Ndata = len(range(windowwidth-1, data.shape[1], stride))
         shape = (data.shape[0], Ndata, width, *data.shape[2:None])
     else:
         Ndata = len(range(windowwidth-1, data.shape[0], stride))
         shape=(Ndata, width, *data.shape[1:None])
-    
+
     if isinstance(data, np.ndarray):
         if batch_dim:
-            strides = (data.itemsize*np.product(data.shape[1:None]), stride*data.strides[1], 
+            strides = (data.itemsize*np.product(data.shape[1:None]), stride*data.strides[1],
                        dilation*data.itemsize*np.product(data.shape[2:None]), *data.strides[2:None])
         else:
             strides = (stride*data.strides[0], dilation*data.itemsize*np.product(data.shape[1:None]), *data.strides[1:None])
         return np.lib.stride_tricks.as_strided(data, shape=shape, strides=strides)
     if isinstance(data, torch.Tensor):
         if batch_dim:
-            strides = (np.product(data.shape[1:None]), stride*data.stride()[1], 
+            strides = (np.product(data.shape[1:None]), stride*data.stride()[1],
                        dilation*np.product(data.shape[2:None]), *data.stride()[2:None])
         else:
             strides = (stride*data.stride()[0], dilation*np.product(data.shape[1:None]), *data.stride()[1:None])
