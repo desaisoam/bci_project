@@ -31,7 +31,7 @@ class DepthwiseConv2d(nn.Conv2d):
     def forward(self, input):
         return F.conv2d(input, self._max_norm(self.weight), self.bias, self.stride,
                         self.padding, self.dilation, self.groups)
-    
+
 class Dense(nn.Linear):
     def __init__(self, input_size=16, output_size=2, max_norm_val=0.25, eps=0.01):
         super(Dense, self).__init__(input_size, output_size)
@@ -56,7 +56,7 @@ class DepthwiseConv2d(nn.Conv2d):
     def forward(self, input):
         return F.conv2d(input, self.weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)
-    
+
 class Dense(nn.Linear):
     def __init__(self, input_size=16, output_size=2, max_norm_val=0.25, eps=0.01):
         super(Dense, self).__init__(input_size, output_size)
@@ -80,13 +80,13 @@ class EEGNet(nn.Module):
     '''a comment'''
     def __init__(self, config, output_dim=5, n_electrodes=64, device=None):
         super(EEGNet, self).__init__()
-        
+
         # set device
         #if device is None: self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         #else: self.device = device
 
         self.C = n_electrodes
-        self.T = int(config['sampling_frequency'] * config['window_length'] / 1000)
+        self.T = int(config['sampling_frequency'] * config['window_length'] / 125)
         self.F1 = config['num_temporal_filters']
         self.D = config['num_spatial_filters']
         self.F2 = self.D * self.F1                                # F2: number of pointwise filters; not necessary to be D * F1.
@@ -120,7 +120,7 @@ class EEGNet(nn.Module):
         print('EEGNet with output dim', self.N)
         #self._ff = nn.Sequential(nn.Linear(dense_input_size, 128), nn.ELU())
         #self._dense = Dense(128, self.N, block2['max_norm_value'], block2['eps'])
-        
+
         self._ff = nn.Identity()
         self._dense = Dense(dense_input_size, self.N, block2['max_norm_value'], block2['eps'])
 
@@ -173,7 +173,7 @@ class EEGNet(nn.Module):
         '''
         if len(x.shape) == 4: #used in training
             x = x.permute(0,3,1,2)
-        
+
         if len(x.shape) == 2:   # used in closed loop, x is (latency/10, channels)
             x = torch.transpose(x, 0, 1)   # x is now (channels, latency)
             x = torch.unsqueeze(torch.unsqueeze(x, 0), 0) # (1, 1, n_electrodes, latency/10)   # use for online
