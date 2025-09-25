@@ -127,7 +127,8 @@ def pipeline(config, model_name=None, data_name=None, verbosity=1, delete_data=F
                                             num_workers = config_train['val_num_workers'],
                                             prefetch_factor = config_train['val_prefetch_factor'])
 
-            n_electrodes = 66 - len(config['data_preprocessor']['ch_to_drop'])
+            # For OpenBCI 16‑channel datasets, fix electrode count to 16
+            n_electrodes = 16
             config_dsop = config['dataset_generator']['dataset_operation']
             output_dim = len(config_dsop['selected_labels']) if not config_dsop['relabel'] else len(config_dsop['mapped_labels'])
             model = EEGNet(config_model, output_dim, n_electrodes)

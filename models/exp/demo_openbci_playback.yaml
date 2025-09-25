@@ -17,6 +17,18 @@ signals:
   totalValidEEGSamples:
     shape: 1
     dtype: int64
+  state_task:
+    shape: 1
+    dtype: int8
+  decoded_pos:
+    shape: 2
+    dtype: float32
+  target_pos:
+    shape: 2
+    dtype: float32
+  game_state:
+    shape: 1
+    dtype: int8
 
 modules:
   logger_disk:
@@ -64,6 +76,25 @@ modules:
       master_board: CYTON_DAISY_BOARD
       playback_loop: false
 
+  dummy_task:
+    constructor: false
+    destructor: false
+    sync:
+      - timer
+    out:
+      - state_task
+      - decoded_pos
+      - target_pos
+      - game_state
+    params:
+      hold_ticks: 250       # ~5 s per state at 20 ms tick
+      amplitude: 0.7
+      state_sequence:
+        - 0
+        - 1
+        - 2
+        - 3
+
   filterEEG:
     constructor: true
     destructor: false
@@ -82,6 +113,7 @@ modules:
     destructor: true
     sync:
       - filterEEG
+      - dummy_task
     in:
       - timer_tick_time_ns
       - eegbufferindex
@@ -89,6 +121,10 @@ modules:
       - totalValidEEGSamples
       - eegbuffersignal
       - databuffer
+      - state_task
+      - decoded_pos
+      - target_pos
+      - game_state
     params:
       log:
         task:
@@ -97,6 +133,10 @@ modules:
             - eegbufferindex
             - numEEGSamples
             - totalValidEEGSamples
+            - state_task
+            - decoded_pos
+            - target_pos
+            - game_state
         eeg:
           index: eegbufferindex
           buffers:
@@ -110,4 +150,3 @@ modules:
           eeg:
             IP: '127.0.0.1'
             PORT: 7702
-
