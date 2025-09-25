@@ -16,6 +16,9 @@ SJtools/copilot/temp/
 wandb/
 analysis/
 
+# Data artifacts (do not commit large derived files)
+data/raspy/preprocessed_data/*.h5
+
 # Project specific^
 .DS_Store
 

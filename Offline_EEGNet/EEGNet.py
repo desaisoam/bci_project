@@ -86,7 +86,13 @@ class EEGNet(nn.Module):
         #else: self.device = device
 
         self.C = n_electrodes
-        self.T = int(config['sampling_frequency'] * config['window_length'] / 125)
+        # Number of time samples after resampling to model.sampling_frequency
+        # Assumes window_length is provided in input samples at data_preprocessor.sampling_frequency
+        fs_in = config.get('input_sampling_frequency', None)
+        if fs_in is None:
+            # Fallback to data_preprocessor.sampling_frequency when available
+            fs_in = config.get('data_preprocessor', {}).get('sampling_frequency', 125)
+        self.T = int(config['sampling_frequency'] * config['window_length'] / fs_in)
         self.F1 = config['num_temporal_filters']
         self.D = config['num_spatial_filters']
         self.F2 = self.D * self.F1                                # F2: number of pointwise filters; not necessary to be D * F1.
@@ -102,7 +108,8 @@ class EEGNet(nn.Module):
         # Block 1
         # -------
         self._conv1 = nn.Conv2d(1, out_channels = self.F1, kernel_size = tuple(block1['conv']), padding='same')
-        self._batchnorm1 = nn.BatchNorm2d(self.F1, False)
+        # Use named argument to avoid accidentally setting eps=0 via positional False
+        self._batchnorm1 = nn.BatchNorm2d(self.F1, affine=False)
         self._depthwise = DepthwiseConv2d(self.F1, self.D, self.C, block1['max_norm_value'], block1['eps'])
         self._batchnorm2 = nn.BatchNorm2d(self.F1 * self.D)
         self._avg_pool1 = nn.AvgPool2d(block1['avg_pool'])

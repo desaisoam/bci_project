@@ -76,6 +76,10 @@ class DatasetGenerator:
             game_state_change = [sc-1 for sc in state_changes]
             game_states = task_data['game_state'].flatten()[game_state_change][:-1]
 
+        # Require at least two state_changes to form a trial
+        if len(state_changes) < 2:
+            return trials, labels if not for_mne else (trials, labels, [])
+
         # Partition trials with the first and the last trials dropped, and drop trials that are too short (than window_length) as well
         task_starts = state_changes[:-1]
 
@@ -83,12 +87,17 @@ class DatasetGenerator:
         eeg_starts = task_data['eeg_step'][task_starts]
         eeg_starts = np.where(eeg_starts==-1, 0, eeg_starts)
         eeg_ends = task_data['eeg_step'][task_ends]
-        
+
         eeg_starts = eeg_starts + int(self.first_ms_to_drop)
 
+        # clamp to available eeg samples
+        eeg_len = eeg_data['databuffer'].shape[0]
+        eeg_starts = np.clip(eeg_starts, 0, max(0, eeg_len-1))
+        eeg_ends = np.clip(eeg_ends, 0, eeg_len)
+
         # prepare to filter selected_seconds (first print how many seconds is in data)
-        start_times_by_trial = (eeg_data['time_ns'][eeg_starts] - eeg_data['time_ns'][0]) / (10**9)
-        end_times_by_trial = (eeg_data['time_ns'][eeg_ends] - eeg_data['time_ns'][0]) / (10**9)
+        start_times_by_trial = (eeg_data['time_ns'][np.minimum(eeg_starts, eeg_len-1)] - eeg_data['time_ns'][0]) / (10**9)
+        end_times_by_trial = (eeg_data['time_ns'][np.minimum(eeg_ends-1, eeg_len-1)] - eeg_data['time_ns'][0]) / (10**9)
         print(f"dataset #{index}: {round(((task_data['time_ns'][-1]-task_data['time_ns'][0]) / (10**9)))} seconds")
 
         for idx in range(len(task_starts)):
@@ -291,11 +300,22 @@ def partition_data(labels, num_folds):
     sub_ids = []
     for label in label_set:
         selected_ids = [l[0] for l in zip(ids, labels) if l[1] == label]
+        if len(selected_ids) == 0:
+            continue
         np.random.shuffle(selected_ids)
         sub_ids_folds = np.array_split(selected_ids, num_folds)
         sub_ids.append(sub_ids_folds)
 
-    ids_folds = [np.concatenate([subgroup[i] for subgroup in sub_ids]) for i in range(num_folds)]
+    if len(sub_ids) == 0:
+        return []
+
+    ids_folds = []
+    for i in range(num_folds):
+        parts = [subgroup[i] for subgroup in sub_ids if len(subgroup[i]) > 0]
+        if len(parts) == 0:
+            ids_folds.append(np.array([], dtype=int))
+        else:
+            ids_folds.append(np.concatenate(parts))
 
     return ids_folds
 
@@ -319,14 +339,16 @@ def augment_data_to_file(trials, labels, kinds, ids_folds, h5_file, config):#TOD
     (n_trials, n_electrodes, n_samples, 1) and (n_trials,), respectively.
     '''
 
-    window_length = config['augmentation']['window_length']
+    window_length = config['augmentation']['window_length']  # in input samples (at data_preprocessor.sampling_frequency)
     stride = config['augmentation']['stride']
     new_samp_freq = config['augmentation']['new_sampling_frequency']
+    fs_in = config['data_preprocessor'].get('sampling_frequency', 125)
     num_noise = config['augmentation']['num_noise']
     detect_artifacts = config['artifact_handling']['detect_artifacts']
     reject_std = config['artifact_handling']['reject_std']
 
-    window_size = int(new_samp_freq * window_length / 1000)
+    # Number of samples in the resampled window: scale by input sampling rate, not a fixed 1000 Hz
+    window_size = int(new_samp_freq * window_length / fs_in)
     portion = int(0.2 * window_length)
     labels_to_keep = set([label[0] for label in labels])
     
@@ -472,6 +494,14 @@ def create_dataset(config, h5_path):
             kind = utils.decide_kind(data)
         eeg_data = utils.read_data_file_to_dict(config['data_dir'] + data + "/eeg.bin")
         task_data = utils.read_data_file_to_dict(config['data_dir'] + data + "/task.bin")
+        # For OpenBCI 16‑channel logs, the last column is a non‑EEG counter.
+        # Strip it before preprocessing so downstream treats only EEG channels as features.
+        eeg_cap = config['data_preprocessor'].get('eeg_cap_type', '')
+        if eeg_cap == 'openbci16':
+            # keep first 16 columns if extra columns exist
+            for key in ['databuffer', 'eegbuffersignal']:
+                if key in eeg_data and eeg_data[key].ndim == 2 and eeg_data[key].shape[1] > 16:
+                    eeg_data[key] = eeg_data[key][:, :16]
         eeg_data['databuffer'] = preprocessor.preprocess(eeg_data['databuffer'])    # preprocess
         data_dicts.append([eeg_data, task_data, kind])                                    # store in data_dicts
 

@@ -268,7 +268,8 @@ def collect_outputs(model, dset, criterion, return_numpy=False):
             loss_i = criterion(out_i['logits'], y)
 
             if return_numpy:
-                logits_collect.extend(out_i['hidden_state'].detach().cpu().numpy())
+                # Collect logits (not hidden) into logits_collect
+                logits_collect.extend(out_i['logits'].detach().cpu().numpy())
                 hidden_states_collect.extend(out_i['hidden_state'].detach().cpu().numpy())
                 labels_collect.extend(y.detach().cpu().numpy())
                 try:
@@ -276,7 +277,8 @@ def collect_outputs(model, dset, criterion, return_numpy=False):
                 except:
                     loss_collect.append(loss_i.item())
             else:
-                logits_collect.extend(out_i['hidden_state'].detach())
+                # Collect logits (not hidden) into logits_collect
+                logits_collect.extend(out_i['logits'].detach())
                 hidden_states_collect.extend(out_i['hidden_state'].detach())
                 labels_collect.extend(y.detach())
                 try:

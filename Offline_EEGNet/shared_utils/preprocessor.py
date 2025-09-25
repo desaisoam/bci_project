@@ -36,6 +36,15 @@ class DataPreprocessor:
         self.order = config['bandpass_filter']['order']
         self.apply_laplacian = config.get('apply_laplacian', False)  # Default True for backward compatibility
         self.sf = config['sampling_frequency']
+        # Normalize skip threshold: default to ~2 seconds worth of samples at input Fs
+        # Old hardcoded default (2000) assumed 1000 Hz input; adapt to arbitrary sampling rates.
+        self.skip_seconds = float(config.get('skip_seconds', 2.0))
+        self.skip_samples_cfg = config.get('skip_samples', None)
+        if self.skip_samples_cfg is not None:
+            # Allow explicit samples override if provided
+            self.skip_samples_eff = int(self.skip_samples_cfg)
+        else:
+            self.skip_samples_eff = int(self.sf * self.skip_seconds)
         self.online_status = config['online_status']
         self.normalizer_type = config['normalizer_type']
         self.first_run = True
@@ -50,13 +59,45 @@ class DataPreprocessor:
         coords: list of integer pairs (list)
             Position indices of each electrode in the grid.
         '''
-
-        if self.eeg_cap_type == 'gel64':
-            ch_names = ['Fp1', 'Fpz']
-            coords = [[0, 4], [0, 5]]
-        elif self.eeg_cap_type == 'openbci16':
-
-            raise ValueError('eeg_cap_type must be openbci16.')
+        if self.eeg_cap_type == 'openbci16':
+            # 16‑channel OpenBCI (Cyton + Daisy) layout, ignoring ear clip reference.
+            # Grid: 5 columns (x=0..4) and 5 rows (y=0..4)
+            #  - x: 0=left‑lateral, 1=left‑medial, 2=midline(empty), 3=right‑medial, 4=right‑lateral
+            #  - y: 0=Fp, 1=F, 2=C/T, 3=P, 4=O
+            mapping = {
+                'Fp1': (1, 0), 'Fp2': (3, 0),
+                'F7':  (0, 1), 'F3':  (1, 1), 'F4':  (3, 1), 'F8':  (4, 1),
+                'T7':  (0, 2), 'C3':  (1, 2), 'C4':  (3, 2), 'T8':  (4, 2),
+                'P7':  (0, 3), 'P3':  (1, 3), 'P4':  (3, 3), 'P8':  (4, 3),
+                'O1':  (1, 4), 'O2':  (3, 4),
+            }
+            # Order MUST match the data column order (Cyton 8 first, then Daisy 8)
+            ch_names = [
+                'Fp1','Fp2','C3','C4','P7','P8','O1','O2',  # Cyton board pins
+                'F7','F8','F3','F4','T7','T8','P3','P4',     # Daisy pins
+            ]
+            coords = [mapping[name] for name in ch_names]
+        elif self.eeg_cap_type == 'gel64': #FOR REFERNCE WE'RE NOT USING THIS RN
+            ch_names = ['Fp1', 'Fpz', 'Fp2', 'F7', 'F3', 'Fz', 'F4', 'F8', 'FC5', 'FC1', 'FC2', 'FC6',
+            'M1', 'T7', 'C3', 'Cz', 'C4', 'T8', 'M2', 'CP5', 'CP1', 'CP2', 'CP6',
+            'P7', 'P3', 'Pz', 'P4', 'P8', 'POz', 'O1', 'O2', 'EOG',
+            'AF7', 'AF3', 'AF4', 'AF8', 'F5', 'F1', 'F2', 'F6',
+            'FC3', 'FCz', 'FC4', 'C5', 'C1', 'C2', 'C6', 'CP3', 'CP4',
+            'P5', 'P1', 'P2', 'P6', 'PO5', 'PO3', 'PO4', 'PO6',
+            'FT7', 'FT8', 'TP7', 'TP8', 'PO7', 'PO8', 'Oz',
+            'TRGR', 'COUNT']
+            coords = [[0, 4], [0, 5], [0, 6], [2, 1], [2, 3], [2, 5], [2, 7], [2, 9],
+            [3, 2], [3, 4], [3, 6], [3, 8], [4, 0], [4, 1], [4, 3], [4, 5], [4, 7], [4, 9], [4, 10],
+            [5, 2], [5, 4], [5, 6], [5, 8], [6, 1], [6, 3], [6, 5], [6, 7], [6, 9],
+            [7, 5], [8, 4], [8, 6], [0, 0], [1, 1], [1, 3], [1, 7], [1, 9],
+            [2, 2], [2, 4], [2, 6], [2, 8], [3, 3], [3, 5], [3, 7],
+            [4, 2], [4, 4], [4, 6], [4, 8], [5, 3], [5, 7],
+            [6, 2], [6, 4], [6, 6], [6, 8],
+            [7, 2], [7, 3], [7, 7], [7, 8],
+            [3, 1], [3, 9], [5, 1], [5, 9], [7, 1], [7, 9], [8, 5],
+            [4, 8], [8, 5]]
+        else:
+            raise ValueError(f'Unknown eeg_cap_type: {self.eeg_cap_type}')
         return ch_names, coords
 
     def bandpass_channels(self, data):
@@ -182,8 +223,13 @@ class DataPreprocessor:
             Data from eeg_data['databuffer'].
         '''
 
+        # If no channels to drop are specified, skip name lookups
+        if not self.ch_to_drop:
+            return data
         ch_names, _ = self.get_electrode_position()
-        ch_index_to_drop = [ch_names.index(ch) for ch in self.ch_to_drop]
+        ch_index_to_drop = [ch_names.index(ch) for ch in self.ch_to_drop if ch in ch_names]
+        if len(ch_index_to_drop) == 0:
+            return data
         data = np.delete(data, ch_index_to_drop, axis=1)
         return data
 
@@ -212,7 +258,8 @@ class DataPreprocessor:
         # Normalize channels
         #If running offline, utilize mean and std dev of all data to normalize
         if self.online_status == 'offline':
-            data = self.normalize_channels(data, zero_center=self.zero_center)
+            # Use sampling‑rate aware skip threshold for normalization
+            data = self.normalize_channels(data, zero_center=self.zero_center, skip_samples=self.skip_samples_eff)
         #If online, normalize with data collected up to this point in time
         if self.online_status == 'online':
             #Check if data buffer not yet filled. If not, return data unaltered
@@ -227,7 +274,7 @@ class DataPreprocessor:
                     self.normalizer = Running_Mean(data)
                 else:
                     raise ValueError("no such noramlizer as:", self.normalizer)
-                self.first_run == False
+                self.first_run = False
             else:
                 self.normalizer(data)
             #Normalize this sample

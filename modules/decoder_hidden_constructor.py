@@ -2,8 +2,13 @@
 
 from pathlib import Path
 from importlib.machinery import SourceFileLoader
-from modules.submodules.shared_utils.preprocessor import DataPreprocessor
-from modules.submodules.shared_utils.utils import read_config
+# Prefer the offline shared_utils (present in this repo); fall back to modules/submodules if available
+try:
+    from Offline_EEGNet.shared_utils.preprocessor import DataPreprocessor
+    from Offline_EEGNet.shared_utils.utils import read_config
+except ImportError:
+    from modules.submodules.shared_utils.preprocessor import DataPreprocessor
+    from modules.submodules.shared_utils.utils import read_config
 from modules.SJutil.DataStructure import deepDictUpdate
 from scipy.signal import resample
 import numpy as np
@@ -37,7 +42,9 @@ model = model.to(device)
 config = read_config(str(Path(decoder_path / "config.yaml")))
 dataPreprocessor = DataPreprocessor(config=deepDictUpdate(config["data_preprocessor"], params["data_preprocessor"]))
 input_length = config['model']['window_length']
-downsampled_length = int(config['model']['sampling_frequency'] * config['model']['window_length'] / 125)
+# Derive downsampled length based on input sampling frequency from config
+fs_in = config.get('data_preprocessor', {}).get('sampling_frequency', 125)
+downsampled_length = int(config['model']['sampling_frequency'] * config['model']['window_length'] / fs_in)
 
 # decoder_output will always be 5 length
 decoder_output[:] = np.zeros(decoder_output.shape)
