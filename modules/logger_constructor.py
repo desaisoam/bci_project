@@ -29,7 +29,10 @@ try:
 except:
     raise Exception('Variable {} is not available as a signal to this module!'.format(params['pause']))
 pause_condition = params['pause_condition'] if 'pause_condition' in params else 'any' # options: 'any' or 'all'
-internal_pause_state = np.zeros_like(pause_var) # True when paused. Lags pause_var by 1 tick.
+if pause_var is None:
+    internal_pause_state = np.array(False, dtype=bool)
+else:
+    internal_pause_state = np.zeros_like(pause_var) # True when paused. Lags pause_var by 1 tick.
 
 # Setup. 
 for stream_name in log.keys():

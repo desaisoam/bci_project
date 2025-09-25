@@ -74,26 +74,18 @@ def main():
     modules = yaml_data['modules']
 
     '''
-    # group_params are passed to module['params'] BEFORE commandline_args
-    #   but AFTER loading the yaml
-    #   WARNING: this will OVERWRITE module['params']
-    # example
-    group_params:
-      # applies to all modules ONLY IF the name of the group is 'global'
-      global:
-        params:
-          key: value
-          key: value
-      # otherwise, specify which modules should receive these params
-      group1:
-        modules:
-          - module1
-          - module2
-        params:
-          key: value
-          key: value
-      group2:
-        ...
+    group_params overlay keys into module['params'] BEFORE commandline_args and AFTER loading yaml.
+    Example yaml:
+      group_params:
+        global:
+          params:
+            key: value
+        dt_group:
+          modules:
+            - module1
+            - module2
+          params:
+            dt: 50000
     '''
     group_params = yaml_data['group_params'] if 'group_params' in yaml_data else {}
 
@@ -187,13 +179,24 @@ def main():
         modules[name]['params']['data_folder'] = data_folder # overwrite data_folder for all modules...is this intended?
         modules[name]['params']['_raspy_dir'] = raspy_dir # directory containing the main subdirectory.
         modules[name]['params']['commandline_args'] = {}
+    # Apply group parameter overlays without mutating the modules dict
     for group_name, group in group_params.items():
+        if not isinstance(group, dict) or 'params' not in group:
+            continue
+        # Determine which modules to target
         if group_name == 'global':
-            modules = modules.keys()
-        for name in modules:
+            target_names = list(modules.keys())
+        else:
+            target_names = group.get('modules', [])
+        # Validate and apply
+        for name in target_names:
+            if name not in modules:
+                # silently skip invalid names to avoid crashing
+                continue
+            if 'params' not in modules[name] or not isinstance(modules[name]['params'], dict):
+                modules[name]['params'] = {}
             for param, value in group['params'].items():
                 modules[name]['params'][param] = value
-                pass
 
     # Parse and add module_args into respective module['params']['commandline_args']
     namespace_module_args = '/global'
