@@ -125,7 +125,8 @@ def train(model, train_ds, val_ds, config, writer, device, verbosity=1):
     #Get loss criterion
     criterion = load_loss_criterion(config['loss_func'], weight=class_weight)
     optimizer = optim.Adam(model.parameters(), lr=config['learning_rate'])  
-    scheduler = ReduceLROnPlateau(optimizer, 'max', verbose=bool(verbosity > 0))  # default patience is 10 and factor is 0.1
+    # Some torch builds don't support 'verbose' kwarg; use default settings
+    scheduler = ReduceLROnPlateau(optimizer, mode='max')  # default patience is 10 and factor is 0.1
     
 
 

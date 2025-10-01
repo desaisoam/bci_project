@@ -1,0 +1,152 @@
+signals:
+  timer_tick_time_ns:
+    shape: 1
+    dtype: int64
+  eegbuffersignal:
+    shape: (1250, 17)
+    dtype: float32
+  databuffer:
+    shape: (1250, 17)
+    dtype: float32
+  eegbufferindex:
+    shape: 1
+    dtype: int16
+  numEEGSamples:
+    shape: 1
+    dtype: int16
+  totalValidEEGSamples:
+    shape: 1
+    dtype: int64
+  state_task:
+    shape: 1
+    dtype: int8
+  decoded_pos:
+    shape: 2
+    dtype: float32
+  target_pos:
+    shape: 2
+    dtype: float32
+  game_state:
+    shape: 1
+    dtype: int8
+
+modules:
+  logger_disk:
+    constructor: true
+    destructor: false
+    loop: false
+    params:
+      save_path: ./data/raspy/
+      connections:
+        local:
+          task:
+            IP: '127.0.0.1'
+            PORT: 7701
+          eeg:
+            IP: '127.0.0.1'
+            PORT: 7702
+
+  timer:
+    constructor: true
+    destructor: true
+    sync:
+      - logger
+    trigger: true
+    out:
+      - timer_tick_time_ns
+    params:
+      timer_type: sleep
+      dt: 20000   # 20 ms
+      verbose: true
+
+  UpdateEEG:
+    constructor: true
+    destructor: true
+    sync:
+      - timer
+    out:
+      - eegbuffersignal
+      - eegbufferindex
+      - numEEGSamples
+      - totalValidEEGSamples
+    trigger: false
+    params:
+      mode: playback
+      file: cyton_daisy_test_data.csv
+      master_board: CYTON_DAISY_BOARD
+      playback_loop: true
+
+  dummy_task:
+    constructor: false
+    destructor: false
+    sync:
+      - timer
+    out:
+      - state_task
+      - decoded_pos
+      - target_pos
+      - game_state
+    params:
+      hold_ticks: 250       # ~5 s per state at 20 ms tick
+      amplitude: 0.7
+      state_sequence:
+        - 0
+        - 1
+        - 2
+        - 3
+
+  filterEEG:
+    constructor: true
+    destructor: false
+    sync:
+      - UpdateEEG
+    in:
+      - eegbuffersignal
+      - eegbufferindex
+      - numEEGSamples
+      - totalValidEEGSamples
+    out:
+      - databuffer
+
+  logger:
+    constructor: true
+    destructor: true
+    sync:
+      - filterEEG
+      - dummy_task
+    in:
+      - timer_tick_time_ns
+      - eegbufferindex
+      - numEEGSamples
+      - totalValidEEGSamples
+      - eegbuffersignal
+      - databuffer
+      - state_task
+      - decoded_pos
+      - target_pos
+      - game_state
+    params:
+      log:
+        task:
+          signals:
+            - timer_tick_time_ns
+            - eegbufferindex
+            - numEEGSamples
+            - totalValidEEGSamples
+            - state_task
+            - decoded_pos
+            - target_pos
+            - game_state
+        eeg:
+          index: eegbufferindex
+          buffers:
+            - eegbuffersignal
+            - databuffer
+      connections:
+        local:
+          task:
+            IP: '127.0.0.1'
+            PORT: 7701
+          eeg:
+            IP: '127.0.0.1'
+            PORT: 7702
