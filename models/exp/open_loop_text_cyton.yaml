@@ -75,7 +75,7 @@ modules:
       - timer_tick_time_ns
     params:
       timer_type: sleep
-      dt: 50000
+      dt: 20000
       verbose: true
 
   UpdateEEG:
@@ -158,6 +158,8 @@ modules:
       cursorRadius: 0
       cursorVel: [0.015, 0.015]
       styleChange: false
+      previewTimeThres: 0.0
+      textVelScale: 0.0
       skipFirstNtrials: 1
       resetCursorPos: true
       decodedVel:
@@ -179,11 +181,18 @@ modules:
         - Both Hands
         - Feet
       action2state_task:
+        # Primary labels used by the text prompts (must match testedAction)
+        Left Hand: 0
+        Right Hand: 1
+        Both Hands: 2
+        Feet: 3
+        still: 4
+        null: -1
+        # Optional aliases (kept for flexibility if prompts change)
         left: 0
         right: 1
         up: 2
         down: 3
-        still: 4
 
   logger:
     constructor: true
@@ -230,4 +239,3 @@ modules:
           eeg:
             IP: '127.0.0.1'
             PORT: 7702
-
