@@ -1,0 +1,391 @@
+signals:
+  # Timing
+  timer_tick_time_ns:
+    shape: 1
+    dtype: int64
+
+  # EEG buffers (125 Hz, 16 EEG + 1 counter)
+  eegbuffersignal:
+    shape: (1250, 17)
+    dtype: float32
+  databuffer:
+    shape: (1250, 17)
+    dtype: float32
+  eegbufferindex:
+    shape: 1
+    dtype: int16
+  numEEGSamples:
+    shape: 1
+    dtype: int16
+  totalValidEEGSamples:
+    shape: 1
+    dtype: int64
+
+  # Task I/O
+  state_task:
+    shape: 1
+    dtype: int8
+  decoded_pos:
+    shape: 2
+    dtype: float32
+  target_pos:
+    shape: 2
+    dtype: float32
+  target_size:
+    shape: 2
+    dtype: float32
+  game_state:
+    shape: 1
+    dtype: int8
+
+  # Placeholders to satisfy SJ_4_directions inputs in open-loop
+  decoder_output:
+    shape: 5
+    dtype: float32
+  kf_state:
+    shape: (7,)
+    dtype: float32
+
+  # Optional SJ diagnostics (kept for compatibility with task module)
+  allow_kf_adapt:
+    shape: 1
+    dtype: bool
+  allow_kf_sync:
+    shape: 1
+    dtype: bool
+  kf_ole_rlud:
+    shape: 4
+    dtype: float32
+  sessionLength:
+    shape: 1
+    dtype: float32
+  activeLength:
+    shape: 1
+    dtype: float32
+  cursorVel:
+    shape: 2
+    dtype: float32
+  ignoreWrongTarget:
+    shape: 1
+    dtype: bool
+  cursorMoveCorrectOnly:
+    shape: 1
+    dtype: bool
+  assistValue:
+    shape: 1
+    dtype: float32
+  assistMode:
+    shape: 2
+    dtype: int8
+  softmaxThres:
+    shape: 1
+    dtype: float32
+  holdTimeThres:
+    shape: 1
+    dtype: float32
+  kfCopilotAlpha:
+    shape: 1
+    dtype: float32
+  hitRate:
+    shape: 1
+    dtype: float32
+  missRate:
+    shape: 1
+    dtype: float32
+  timeoutRate:
+    shape: 1
+    dtype: float32
+  trialCount:
+    shape: 1
+    dtype: float32
+  render_angle:
+    shape: 1
+    dtype: float32
+  numCompletedBlocks:
+    shape: 1
+    dtype: int32
+  enableKfSyncInternal:
+    shape: 1
+    dtype: int8
+
+modules:
+  # Receives and saves streamed records from logger
+  logger_disk:
+    constructor: true
+    destructor: false
+    loop: false
+    params:
+      save_path: ./data/raspy/
+      connections:
+        local:
+          task:
+            IP: '127.0.0.1'
+            PORT: 7701
+          eeg:
+            IP: '127.0.0.1'
+            PORT: 7702
+
+  # Master timing source (20 ms ticks)
+  timer:
+    constructor: true
+    destructor: true
+    sync:
+      - logger
+    trigger: true
+    out:
+      - timer_tick_time_ns
+    params:
+      timer_type: sleep
+      dt: 50000
+      verbose: true
+
+  # Live EEG acquisition from OpenBCI CytonDaisy via BrainFlow
+  UpdateEEG:
+    constructor: true
+    destructor: true
+    sync:
+      - timer
+    out:
+      - eegbuffersignal
+      - eegbufferindex
+      - numEEGSamples
+      - totalValidEEGSamples
+    trigger: false
+    params:
+      serial_port: /dev/cu.usbserial-DP05I34K
+      pkg_expected_step: 2  # Cyton+Daisy HW package counter advances by 2 per sample
+      # Apply 8x gain, NORMAL input, remove from BIAS, SRB2 ON, SRB1 OFF for all 16 channels
+      # Format: x(CH, PD, GAIN, INPUT, BIAS, SRB2, SRB1)X
+      # GAIN=4 => 8x; BIAS=0 => remove from bias
+      openbci_commands:
+        # Main board CH1..8
+        - x1040010X
+        - x2040010X
+        - x3040010X
+        - x4040010X
+        - x5040010X
+        - x6040010X
+        - x7040010X
+        - x8040010X
+        # Daisy CH9..16: Q W E R T Y U I
+        - xQ040010X
+        - xW040010X
+        - xE040010X
+        - xR040010X
+        - xT040010X
+        - xY040010X
+        - xU040010X
+        - xI040010X
+
+  # Real-time filtering (notch + 4–40 Hz bandpass)
+  filterEEG:
+    constructor: true
+    destructor: false
+    sync:
+      - UpdateEEG
+    in:
+      - eegbuffersignal
+      - eegbufferindex
+      - numEEGSamples
+      - totalValidEEGSamples
+    out:
+      - databuffer
+
+  # Provide placeholders so SJ can run without a decoder/KF online
+  openloop_placeholders:
+    constructor: false
+    destructor: false
+    sync:
+      - timer
+    out:
+      - decoder_output
+      - kf_state
+    name: openloop_placeholders
+
+  # Task UI + label generator (open-loop)
+  SJ_4_directions:
+    name: kf_4_directions
+    constructor: true
+    destructor: true
+    sync:
+      - timer
+    in:
+      - eegbufferindex
+      - state_task
+      - decoder_output
+      - kf_state
+    out:
+      - decoded_pos
+      - target_pos
+      - target_size
+      - game_state
+      - allow_kf_adapt
+      - allow_kf_sync
+      - kf_ole_rlud
+      - sessionLength
+      - activeLength
+      - cursorVel
+      - ignoreWrongTarget
+      - cursorMoveCorrectOnly
+      - assistValue
+      - assistMode
+      - softmaxThres
+      - holdTimeThres
+      - kfCopilotAlpha
+      - hitRate
+      - missRate
+      - timeoutRate
+      - trialCount
+      - render_angle
+      - numCompletedBlocks
+      - enableKfSyncInternal
+    params:
+      sessionLength: 600
+      syncLength: 300
+      waitIntegerBlocks: true
+      fullScreen: false
+      screenSize: [700, 700]
+      objScale: 0.001
+      cursorRadius: 10
+      cursorVel: [0.012, 0.012]
+      ignoreWrongTarget: false
+      showAllTarget: false
+      skipFirstNtrials: 4
+      useRandomTargetPos: false
+      randomTargetPosRadius: -1
+      # Required target and label mappings
+      useCircleTargets: true
+      targetsInfo:
+        left:   [[-0.7,  0.0], [0.6, 0.6]]
+        right:  [[ 0.7,  0.0], [0.6, 0.6]]
+        up:     [[ 0.0,  0.7], [0.6, 0.6]]
+        down:   [[ 0.0, -0.7], [0.6, 0.6]]
+      defaultTargetSize: [0.6, 0.6]
+      target2state_task:
+        left: 0
+        right: 1
+        up: 2
+        down: 3
+        still: 4
+        LU: 5
+        LD: 6
+        RU: 7
+        RD: 8
+        null: -1
+      decodedVel:
+        0: [-1.0,  0.0]
+        1: [ 1.0,  0.0]
+        2: [ 0.0,  1.0]
+        3: [ 0.0, -1.0]
+        4: [ 0.0,  0.0]
+      cursorMoveInCorretDirectionOnly: false
+      centerIn: true
+      enforceCenter: reset
+      resetCursorPos: false
+      styleChange: true
+      styleChangeBallSize: 1.0
+      styleChangeCursorSize: [0.1, 0.1]
+      targetWrongColor: [60, 60, 60]
+      yamlName: models/exp/open_loop_cyton.yaml
+      dt: 50000
+      # Time and assistance thresholds
+      holdTimeThres: 0.5
+      dwellTimeThres: 0.5
+      graceTimeThres: 0.0
+      softmaxThres: 0.5
+      assist: 0.0
+      assistMode: n2
+      kfCopilotAlpha: 1.0
+      # Block timing (seconds)
+      inactiveLength: 0
+      delayedLength: 0
+      activeLength: 16
+      calibrationLength: 5
+      # Display toggles
+      showSoftmax: false
+      showPredictedTarget: false
+      showHeatmap: false
+      showCountDown: true
+
+  # Streams both task signals and EEG buffers to logger_disk
+  logger:
+    constructor: true
+    destructor: true
+    sync:
+      - filterEEG
+      - SJ_4_directions
+    in:
+      - timer_tick_time_ns
+      - eegbuffersignal
+      - databuffer
+      - eegbufferindex
+      - state_task
+      - decoder_output
+      - decoded_pos
+      - target_pos
+      - target_size
+      - game_state
+      - allow_kf_adapt
+      - allow_kf_sync
+      - kf_ole_rlud
+      - sessionLength
+      - activeLength
+      - cursorVel
+      - ignoreWrongTarget
+      - cursorMoveCorrectOnly
+      - assistValue
+      - assistMode
+      - softmaxThres
+      - holdTimeThres
+      - kfCopilotAlpha
+      - hitRate
+      - missRate
+      - timeoutRate
+      - trialCount
+      - render_angle
+      - numCompletedBlocks
+      - enableKfSyncInternal
+    params:
+      log:
+        task:
+          signals:
+            - timer_tick_time_ns
+            - state_task
+            - decoder_output
+            - decoded_pos
+            - target_pos
+            - target_size
+            - game_state
+            - allow_kf_adapt
+            - allow_kf_sync
+            - kf_ole_rlud
+            - sessionLength
+            - activeLength
+            - cursorVel
+            - ignoreWrongTarget
+            - cursorMoveCorrectOnly
+            - assistValue
+            - assistMode
+            - softmaxThres
+            - holdTimeThres
+            - kfCopilotAlpha
+            - hitRate
+            - missRate
+            - timeoutRate
+            - trialCount
+            - render_angle
+            - numCompletedBlocks
+            - enableKfSyncInternal
+        eeg:
+          index: eegbufferindex
+          buffers:
+            - eegbuffersignal
+            - databuffer
+      connections:
+        local:
+          task:
+            IP: '127.0.0.1'
+            PORT: 7701
+          eeg:
+            IP: '127.0.0.1'
+            PORT: 7702

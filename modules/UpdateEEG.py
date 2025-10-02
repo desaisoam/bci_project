@@ -15,8 +15,12 @@ try:
 
         # For real package counter, get raw values as int64 for unwrapping; else, use None
         raw_pkg = None
-        if 'has_pkg_channel' in globals() and has_pkg_channel:
-            raw_pkg = data_2d[package_num_channel, :].astype(np.int64)
+        # Only use HW package counter if available AND enabled via params
+        if ('has_pkg_channel' in globals() and has_pkg_channel) and ('use_pkg_counter' in globals() and use_pkg_counter):
+            try:
+                raw_pkg = data_2d[package_num_channel, :].astype(np.int64)
+            except Exception:
+                raw_pkg = None
 
         # Skip initial samples if needed
         # Note: We still write samples but mark nSamples=0 if skipping is active
@@ -45,8 +49,14 @@ try:
             eegbuffersignal[bufferInd - bufferoffset] = row
             bufferInd = (bufferInd - bufferoffset + 1) % bufferoffset + bufferoffset
 
-            # Continuity check on continuous counter
-            if prevCount > 0 and (cont != prevCount + 1):
+            # Continuity check on continuous counter (allow configurable step)
+            expected_step = 1
+            if raw_pkg is not None and 'pkg_expected_step' in globals():
+                try:
+                    expected_step = int(pkg_expected_step)
+                except Exception:
+                    expected_step = 1
+            if prevCount > 0 and (cont != prevCount + expected_step):
                 print(f"!!!!!!!!! Missing data between samples {prevCount} and {cont}")
             prevCount = cont
 
