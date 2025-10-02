@@ -37,6 +37,8 @@ def main():
                         help="Custom relative folder name under configured save_path; supports {date} and {counter}")
     parser.add_argument("--module_args", default="",
                         help="Extra module args string passed through to main (advanced)")
+    parser.add_argument("-overwrite_params", default=False, action="store_true",
+                        help="If set, module_args also overwrite params (not just commandline_args)")
     args = parser.parse_args()
 
     # Validate model file exists
@@ -54,6 +56,8 @@ def main():
         "--logfile", args.logfile,
         "--module_args", args.module_args,
     ]
+    if args.overwrite_params:
+        cmd.append("-overwrite_params")
     if args.data_folder is not None:
         cmd.extend(["--data_folder", args.data_folder])
 
@@ -80,4 +84,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

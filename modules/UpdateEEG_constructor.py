@@ -54,6 +54,21 @@ if mode == 'playback':
     loop = str(params.get('playback_loop', 'false')).lower() in ['1','true','yes']
     board.config_board(f"loopback_{'true' if loop else 'false'}")
 
+# Optional: apply user-provided low-level OpenBCI/Cyton commands before starting stream
+# These are board-specific ASCII commands (same as used by the OpenBCI firmware/GUI),
+# passed through BrainFlow's config_board(). Use them to adjust channel gain, bias, SRB, etc.
+user_cmds = params.get('openbci_commands', [])
+if isinstance(user_cmds, str):
+    user_cmds = [user_cmds]
+for cmd in user_cmds:
+    try:
+        print(f"Applying board command: {cmd}")
+        board.config_board(cmd)
+        # small delay to avoid overloading the bridge on back-to-back commands
+        time.sleep(0.05)
+    except Exception as e:
+        print(f"Warning: failed to apply board command '{cmd}': {e}")
+
 board.start_stream()
 
 # Get sampling rate and channel info from physical id
@@ -64,7 +79,12 @@ has_pkg_channel = isinstance(package_num_channel, int) and package_num_channel >
 
 # Parameters for unwrapping hardware package counter into a continuous counter
 # Default modulus 256 for OpenBCI-family devices; configurable via YAML (params.pkg_modulus)
+# Some devices (e.g., Cyton Daisy) increment the package counter by 2 each sample.
+# You can set params.pkg_expected_step to match the device behavior (default 1) or
+# disable the HW package counter entirely with params.use_pkg_counter: false.
 pkg_modulus = int(params.get('pkg_modulus', 256))
+pkg_expected_step = int(params.get('pkg_expected_step', 1))
+use_pkg_counter = bool(params.get('use_pkg_counter', True))
 pkg_epoch = 0
 last_pkg = None
 

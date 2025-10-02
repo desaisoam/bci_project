@@ -1,0 +1,233 @@
+signals:
+  timer_tick_time_ns:
+    shape: 1
+    dtype: int64
+  # EEG buffers (125 Hz, 16 EEG + 1 counter)
+  eegbuffersignal:
+    shape: (1250, 17)
+    dtype: float32
+  databuffer:
+    shape: (1250, 17)
+    dtype: float32
+  eegbufferindex:
+    shape: 1
+    dtype: int16
+  numEEGSamples:
+    shape: 1
+    dtype: int16
+  totalValidEEGSamples:
+    shape: 1
+    dtype: int64
+  # Task signals
+  state_task:
+    shape: 1
+    dtype: int8
+  decoded_pos:
+    shape: 2
+    dtype: float32
+  target_pos:
+    shape: 2
+    dtype: float32
+  target_size:
+    shape: 2
+    dtype: float32
+  game_state:
+    shape: 1
+    dtype: int8
+  # Placeholders (no decoder in open loop)
+  decoder_output:
+    shape: 5
+    dtype: float32
+  kf_state:
+    shape: (7,)
+    dtype: float32
+  # Text UI extras
+  text_pos:
+    shape: 2
+    dtype: float64
+  text_direction:
+    shape: 1
+    dtype: int16
+
+modules:
+  logger_disk:
+    constructor: true
+    destructor: false
+    loop: false
+    params:
+      save_path: ./data/raspy/
+      connections:
+        local:
+          task:
+            IP: '127.0.0.1'
+            PORT: 7701
+          eeg:
+            IP: '127.0.0.1'
+            PORT: 7702
+
+  timer:
+    constructor: true
+    destructor: true
+    sync:
+      - logger
+    trigger: true
+    out:
+      - timer_tick_time_ns
+    params:
+      timer_type: sleep
+      dt: 50000
+      verbose: true
+
+  UpdateEEG:
+    constructor: true
+    destructor: true
+    sync:
+      - timer
+    out:
+      - eegbuffersignal
+      - eegbufferindex
+      - numEEGSamples
+      - totalValidEEGSamples
+    trigger: false
+    params:
+      serial_port: /dev/cu.usbserial-DP05I34K
+      pkg_expected_step: 2
+      openbci_commands:
+        - x1040010X
+        - x2040010X
+        - x3040010X
+        - x4040010X
+        - x5040010X
+        - x6040010X
+        - x7040010X
+        - x8040010X
+        - xQ040010X
+        - xW040010X
+        - xE040010X
+        - xR040010X
+        - xT040010X
+        - xY040010X
+        - xU040010X
+        - xI040010X
+
+  filterEEG:
+    constructor: true
+    destructor: false
+    sync:
+      - UpdateEEG
+    in:
+      - eegbuffersignal
+      - eegbufferindex
+      - numEEGSamples
+      - totalValidEEGSamples
+    out:
+      - databuffer
+
+  openloop_placeholders:
+    constructor: false
+    destructor: false
+    sync:
+      - timer
+    out:
+      - decoder_output
+      - kf_state
+    name: openloop_placeholders
+
+  SJ_text_classification:
+    constructor: true
+    destructor: true
+    sync:
+      - timer
+    in:
+      - eegbufferindex
+      - state_task
+      - decoder_output
+    out:
+      - decoded_pos
+      - target_pos
+      - target_size
+      - game_state
+      - text_pos
+      - text_direction
+    params:
+      sessionLength: 1200
+      screenSize: [700, 700]
+      actionTextFontSize: 80
+      fullScreen: false
+      objScale: 0.001
+      cursorRadius: 0
+      cursorVel: [0.015, 0.015]
+      styleChange: false
+      skipFirstNtrials: 1
+      resetCursorPos: true
+      decodedVel:
+        0: [-1.0,  0.0]
+        1: [ 1.0,  0.0]
+        2: [ 0.0,  1.0]
+        3: [ 0.0, -1.0]
+        4: [ 0.0,  0.0]
+      graceTimeThres: 0.0
+      softmaxThres: 0.0
+      activeLength: 20
+      inactiveLength: 2
+      showSoftmax: false
+      showCountDown: true
+      yamlName: models/exp/open_loop_text_cyton.yaml
+      testedAction:
+        - Left Hand
+        - Right Hand
+        - Both Hands
+        - Feet
+      action2state_task:
+        left: 0
+        right: 1
+        up: 2
+        down: 3
+        still: 4
+
+  logger:
+    constructor: true
+    destructor: true
+    sync:
+      - filterEEG
+      - SJ_text_classification
+    in:
+      - timer_tick_time_ns
+      - eegbuffersignal
+      - databuffer
+      - eegbufferindex
+      - state_task
+      - decoder_output
+      - decoded_pos
+      - target_pos
+      - target_size
+      - game_state
+      - text_pos
+      - text_direction
+    params:
+      log:
+        task:
+          signals:
+            - timer_tick_time_ns
+            - state_task
+            - decoder_output
+            - decoded_pos
+            - target_pos
+            - target_size
+            - game_state
+            - text_pos
+            - text_direction
+        eeg:
+          index: eegbufferindex
+          buffers:
+            - eegbuffersignal
+            - databuffer
+      connections:
+        local:
+          task:
+            IP: '127.0.0.1'
+            PORT: 7701
+          eeg:
+            IP: '127.0.0.1'
+            PORT: 7702
+

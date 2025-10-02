@@ -2831,7 +2831,8 @@ class SJ_4_directions:
             (self.activeLength, 'activeLength'),
             (self.cursorVel, 'cursorVel'),
             (self.ignoreWrongTarget, 'ignoreWrongTarget'),
-            (self.cursorMoveInCorretDirectionOnly, 'cursorMoveInCorretDirectionOnly'),
+            # NOTE: shared memory name shortened to avoid POSIX shm name length limits on macOS
+            (self.cursorMoveInCorretDirectionOnly, 'cursorMoveCorrectOnly'),
             (self.assistValue, 'assistValue'),
             (self.assistMode, 'assistMode'),
             (self.softmaxThres, 'softmaxThres'),
