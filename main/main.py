@@ -136,11 +136,11 @@ def main():
     if data_folder[-1] != '/':
         data_folder = data_folder + '/'
 
-    if save_any:
-        if not os.path.exists(save_path):
-            pathlib.Path(save_path).mkdir(parents=True)
-        if not os.path.exists(data_folder):
-            pathlib.Path(data_folder).mkdir(parents=True)
+    # Create data_folder even when not saving, as some modules (e.g. kf_clda) save init state
+    if not os.path.exists(save_path):
+        pathlib.Path(save_path).mkdir(parents=True)
+    if not os.path.exists(data_folder):
+        pathlib.Path(data_folder).mkdir(parents=True)
 
     log_filename = data_folder + 'logfile.log'
     if use_logfile:
@@ -170,6 +170,7 @@ def main():
         sys.stdout = Logger()
     else:
         log_queue = None
+        log_list = []  # Initialize even when not logging to prevent UnboundLocalError
 
     for name in modules:
         if 'params' not in modules[name]:

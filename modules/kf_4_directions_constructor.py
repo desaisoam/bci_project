@@ -539,7 +539,8 @@ class SJ_4_directions:
         self.ignoreWrongTarget = params['ignoreWrongTarget']
         self.ignoreCorrectTarget = params.get('ignoreCorrectTarget', False)
         self.skipFirstNtrials = params['skipFirstNtrials']
-        self.cursorMoveInCorretDirectionOnly = params.get('cursorMoveInCorretDirectionOnly', self.cursorMoveInCorretDirectionOnly)
+        # Accept both long and short names for macOS compatibility (31 char limit on shm names)
+        self.cursorMoveInCorretDirectionOnly = params.get('cursorCorrectDir', params.get('cursorMoveInCorretDirectionOnly', self.cursorMoveInCorretDirectionOnly))
         self.constrain1D = params.get('constrain1D', self.constrain1D)
         self.restrictHalfPlane = params.get('restrictHalfPlane', self.restrictHalfPlane)
         self.correctVsOthers = params.get('correctVsOthers', self.correctVsOthers)
@@ -2831,7 +2832,7 @@ class SJ_4_directions:
             (self.activeLength, 'activeLength'),
             (self.cursorVel, 'cursorVel'),
             (self.ignoreWrongTarget, 'ignoreWrongTarget'),
-            (self.cursorMoveInCorretDirectionOnly, 'cursorMoveInCorretDirectionOnly'),
+            (self.cursorMoveInCorretDirectionOnly, 'cursorCorrectDir'),  # Shortened for macOS 31-char shm limit
             (self.assistValue, 'assistValue'),
             (self.assistMode, 'assistMode'),
             (self.softmaxThres, 'softmaxThres'),
