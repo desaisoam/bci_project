@@ -276,7 +276,7 @@ class DataPreprocessor:
                     raise ValueError("no such noramlizer as:", self.normalizer)
                 self.first_run = False
             else:
-                self.normalizer(data)
+                self.normalizer.include(data)  # Update normalizer with new data
             #Normalize this sample
             data = ((data-self.normalizer.mean) / self.normalizer.std)
 
