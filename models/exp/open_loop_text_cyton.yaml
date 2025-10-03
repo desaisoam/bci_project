@@ -171,7 +171,7 @@ modules:
       graceTimeThres: 0.0
       softmaxThres: 0.0
       activeLength: 20
-      inactiveLength: 2
+      inactiveLength: 2 
       showSoftmax: false
       showCountDown: true
       yamlName: models/exp/open_loop_text_cyton.yaml
