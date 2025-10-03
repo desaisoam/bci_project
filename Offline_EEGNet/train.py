@@ -125,7 +125,8 @@ def train(model, train_ds, val_ds, config, writer, device, verbosity=1):
     #Get loss criterion
     criterion = load_loss_criterion(config['loss_func'], weight=class_weight)
     optimizer = optim.Adam(model.parameters(), lr=config['learning_rate'])  
-    scheduler = ReduceLROnPlateau(optimizer, 'max', verbose=bool(verbosity > 0))  # default patience is 10 and factor is 0.1
+    # Some torch builds don't support 'verbose' kwarg; use default settings
+    scheduler = ReduceLROnPlateau(optimizer, mode='max')  # default patience is 10 and factor is 0.1
     
 
 
@@ -268,7 +269,8 @@ def collect_outputs(model, dset, criterion, return_numpy=False):
             loss_i = criterion(out_i['logits'], y)
 
             if return_numpy:
-                logits_collect.extend(out_i['hidden_state'].detach().cpu().numpy())
+                # Collect logits (not hidden) into logits_collect
+                logits_collect.extend(out_i['logits'].detach().cpu().numpy())
                 hidden_states_collect.extend(out_i['hidden_state'].detach().cpu().numpy())
                 labels_collect.extend(y.detach().cpu().numpy())
                 try:
@@ -276,7 +278,8 @@ def collect_outputs(model, dset, criterion, return_numpy=False):
                 except:
                     loss_collect.append(loss_i.item())
             else:
-                logits_collect.extend(out_i['hidden_state'].detach())
+                # Collect logits (not hidden) into logits_collect
+                logits_collect.extend(out_i['logits'].detach())
                 hidden_states_collect.extend(out_i['hidden_state'].detach())
                 labels_collect.extend(y.detach())
                 try:

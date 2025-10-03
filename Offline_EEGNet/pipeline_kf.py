@@ -20,7 +20,7 @@ import sqlite3
 import pandas as pd
 import random
 import shutil
-from utils import create_confusion_matrix 
+from utils import create_confusion_matrix
 from flatten_dict import flatten
 import pickle
 from torch.utils.tensorboard import SummaryWriter
@@ -100,7 +100,7 @@ for validation_fold in range(config_train['num_folds']):
     train_folds.pop(validation_fold)
 
     train_dataset = EEGData(h5_path, train_folds)
-    train_dataset = DataLoader(train_dataset, 
+    train_dataset = DataLoader(train_dataset,
                                batch_size  = config_train['train_batch_size'],
                                shuffle = config_train['train_shuffle'],
                                drop_last = config_train['train_drop_last'],
@@ -108,14 +108,14 @@ for validation_fold in range(config_train['num_folds']):
                                prefetch_factor = config_train['train_prefetch_factor'])
 
     validation_dataset = EEGData(h5_path, [validation_fold], train=False)
-    validation_dataset = DataLoader(validation_dataset, 
+    validation_dataset = DataLoader(validation_dataset,
                                     batch_size  = config_train['val_batch_size'],
                                     shuffle = config_train['val_shuffle'],
                                     drop_last = config_train['val_drop_last'],
                                     num_workers = config_train['val_num_workers'],
                                     prefetch_factor = config_train['val_prefetch_factor'])
 
-    n_electrodes = 66 - len(config['data_preprocessor']['ch_to_drop'])
+    n_electrodes = 16 - len(config['data_preprocessor']['ch_to_drop'])
     config_dsop = config['dataset_generator']['dataset_operation']
     output_dim = len(config_dsop['selected_labels']) if not config_dsop['relabel'] else len(config_dsop['mapped_labels'])
     model = EEGNet(config_model, output_dim, n_electrodes)
@@ -136,14 +136,14 @@ for validation_fold in range(config_train['num_folds']):
     with open(model_dir + '/results.csv', mode='a') as csv_file:
         csv_writer = csv.writer(csv_file)
         csv_writer.writerow([validation_fold,
-                            train_stats['acc'][best_model_index], 
+                            train_stats['acc'][best_model_index],
                             train_stats['val_acc'][best_model_index]])
 
     if train_stats['val_acc'][best_model_index] > best_acc:
         best_acc = train_stats['val_acc'][best_model_index]
         best_model = trained_EEGNet
         best_fold = validation_fold
-        
+
     losses[validation_fold] = {}
     losses[validation_fold]['training'] = train_losses
     losses[validation_fold]['val'] = val_losses

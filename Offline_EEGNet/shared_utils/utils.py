@@ -46,7 +46,9 @@ def model_namer(sql_conn, train_on_server, model_arch_name):
         used_names = list(used_names.name)
     
     # import word list from unix install
-    with open(pathlib.Path(__file__) / '..' / 'words') as f:
+    # Resolve path to the bundled words list robustly
+    words_path = pathlib.Path(__file__).resolve().parent / 'words'
+    with open(words_path) as f:
         words = f.read().splitlines()
     words = [word.lower() for word in words if "'" not in word]
     

@@ -19,20 +19,19 @@ def instantiate_model(config_file, model_architecture, model_file):
 
     # Instantiate the model with params in config
     config_model = config['model']
-    n_electrodes = 66 - len(config['data_preprocessor']['ch_to_drop'])
+    # Electrode count: prefer cap-specific value when using OpenBCI 16‑ch
+    cap = config.get('data_preprocessor', {}).get('eeg_cap_type', '')
+    if cap == 'openbci16':
+        n_electrodes = 16
+    else:
+        # Backward‑compatible default for ANT gel64 configs
+        n_electrodes = 66 - len(config['data_preprocessor']['ch_to_drop'])
     config_dsop = config['dataset_generator']['dataset_operation']
     output_dim = len(config_dsop['selected_labels']) if not config_dsop['relabel'] else len(config_dsop['mapped_labels'])
     model = Model(config_model, output_dim, n_electrodes)
 
     # Load the model's state from the best trained fold
-    device_ids = [0]
-    if len(device_ids) > 1:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = torch.nn.DataParallel(model, device_ids=device_ids)
-    elif len(device_ids) == 1:
-        device = torch.device(device_ids[0])
-    else:
-        device = torch.device('cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.load_state_dict(torch.load(model_file, map_location=device))
 
     return model
