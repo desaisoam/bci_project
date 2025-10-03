@@ -15,6 +15,7 @@ from EEGNet import EEGNet
 from train import train, test
 import train_kalmanfilter
 import csv
+import traceback
 import git
 import sqlite3
 import pandas as pd
@@ -127,19 +128,38 @@ def pipeline(config, model_name=None, data_name=None, verbosity=1, delete_data=F
                                             num_workers = config_train['val_num_workers'],
                                             prefetch_factor = config_train['val_prefetch_factor'])
 
-            n_electrodes = 66 - len(config['data_preprocessor']['ch_to_drop'])
+            # For OpenBCI 16‑channel datasets, fix electrode count to 16
+            n_electrodes = 16
             config_dsop = config['dataset_generator']['dataset_operation']
             output_dim = len(config_dsop['selected_labels']) if not config_dsop['relabel'] else len(config_dsop['mapped_labels'])
             model = EEGNet(config_model, output_dim, n_electrodes)
             
+            # Select device with graceful fallback (supports 'mps', 'cuda', 'cpu')
             device_ids = config['device_id']
             if len(device_ids) > 1:
+                # Multi-device: prefer CUDA if available, otherwise stay on CPU
                 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
                 model = nn.DataParallel(model, device_ids=device_ids)
                 print('using DataParalel')
             else:
-                device = torch.device(device_ids[0])
-                print('not using DataParalel')
+                requested = str(device_ids[0]).lower()
+                selected = 'cpu'
+                if requested in ['cuda', 'gpu', 'cuda:0']:
+                    if torch.cuda.is_available():
+                        selected = 'cuda'
+                    else:
+                        print('CUDA not available, falling back to CPU')
+                elif requested in ['mps', 'metal', 'apple']:
+                    mps_ok = hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
+                    if mps_ok:
+                        selected = 'mps'
+                    else:
+                        print('MPS not available, falling back to CPU')
+                else:
+                    # keep 'cpu'
+                    pass
+                device = torch.device(selected)
+                print(f'using device: {device}')
             model.to(device)
 
             trained_EEGNet, train_stats, best_model_index, train_losses, val_losses, pred_labels, true_labels = train(
@@ -205,8 +225,9 @@ def pipeline(config, model_name=None, data_name=None, verbosity=1, delete_data=F
 
 
         results = pd.read_csv(model_dir + "/results.csv")
-    except:
-        pass
+    except Exception as e:
+        print("[pipeline] Training failed with exception:", repr(e))
+        traceback.print_exc()
     finally:
         os.remove(h5_path)
     print('============================================================')

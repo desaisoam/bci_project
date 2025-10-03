@@ -47,7 +47,7 @@ def main():
     parser.add_argument('--module_args', default='', help='params to pass on to modules as params->commandline_args, or as params->key. Format is --module_args "--global_var1 global_val1 /namespaceA --A_var1 A_val1 --A_var2 A_val2 /namespaceB" --B_var1 B_val1'
                         ' where namespace is the name of the module (the yaml name, which does not correspond to the file name if the name field is specified)')
     parser.add_argument('-overwrite_params', default=False, action='store_true', help='whether to overwrite params in addition to writing to commandline_args')
-    
+
     #models_dir = './models/' # todo?: maybe switch to dynamically allocated path or based on some install
     #modules_dir = './modules/'
     models_dir = raspy_dir + '/models/'
@@ -74,26 +74,18 @@ def main():
     modules = yaml_data['modules']
 
     '''
-    # group_params are passed to module['params'] BEFORE commandline_args
-    #   but AFTER loading the yaml
-    #   WARNING: this will OVERWRITE module['params']
-    # example
-    group_params:
-      # applies to all modules ONLY IF the name of the group is 'global'
-      global:
-        params:
-          key: value
-          key: value
-      # otherwise, specify which modules should receive these params
-      group1:
-        modules:
-          - module1
-          - module2
-        params:
-          key: value
-          key: value
-      group2:
-        ...
+    group_params overlay keys into module['params'] BEFORE commandline_args and AFTER loading yaml.
+    Example yaml:
+      group_params:
+        global:
+          params:
+            key: value
+        dt_group:
+          modules:
+            - module1
+            - module2
+          params:
+            dt: 50000
     '''
     group_params = yaml_data['group_params'] if 'group_params' in yaml_data else {}
 
@@ -143,18 +135,18 @@ def main():
                 data_folder = data_folder.replace('{counter}', str(max(counter_vals) + 1))
     if data_folder[-1] != '/':
         data_folder = data_folder + '/'
-    
-    if save_any:
-        if not os.path.exists(save_path):
-            pathlib.Path(save_path).mkdir(parents=True)
-        if not os.path.exists(data_folder):
-            pathlib.Path(data_folder).mkdir(parents=True)
-    
+
+    # Create data_folder even when not saving, as some modules (e.g. kf_clda) save init state
+    if not os.path.exists(save_path):
+        pathlib.Path(save_path).mkdir(parents=True)
+    if not os.path.exists(data_folder):
+        pathlib.Path(data_folder).mkdir(parents=True)
+
     log_filename = data_folder + 'logfile.log'
     if use_logfile:
         log_file = open(log_filename, 'w')
         log_file.write(str(sys.argv) + '\n') # write the command line arguments to the logfile
-        
+
         log_queue = mp.Queue(10000) # queue which holds the printed strings to be collected by main.py
         log_list = [] # list which holds the printed strings and is saved to disk at the end to prevent timing violations.
         # Class which captures print output. Writes to terminal and puts to log_queue.
@@ -178,7 +170,8 @@ def main():
         sys.stdout = Logger()
     else:
         log_queue = None
-    
+        log_list = []  # Initialize even when not logging to prevent UnboundLocalError
+
     for name in modules:
         if 'params' not in modules[name]:
             modules[name]['params'] = {}
@@ -187,14 +180,25 @@ def main():
         modules[name]['params']['data_folder'] = data_folder # overwrite data_folder for all modules...is this intended?
         modules[name]['params']['_raspy_dir'] = raspy_dir # directory containing the main subdirectory.
         modules[name]['params']['commandline_args'] = {}
+    # Apply group parameter overlays without mutating the modules dict
     for group_name, group in group_params.items():
+        if not isinstance(group, dict) or 'params' not in group:
+            continue
+        # Determine which modules to target
         if group_name == 'global':
-            modules = modules.keys()
-        for name in modules:
+            target_names = list(modules.keys())
+        else:
+            target_names = group.get('modules', [])
+        # Validate and apply
+        for name in target_names:
+            if name not in modules:
+                # silently skip invalid names to avoid crashing
+                continue
+            if 'params' not in modules[name] or not isinstance(modules[name]['params'], dict):
+                modules[name]['params'] = {}
             for param, value in group['params'].items():
                 modules[name]['params'][param] = value
-                pass
-    
+
     # Parse and add module_args into respective module['params']['commandline_args']
     namespace_module_args = '/global'
     module_args_state = 'no_name'
@@ -250,7 +254,7 @@ def main():
             if 'destructor' in module and module['destructor']:
                 shutil.copyfile(modules_dir + name + '_destructor.py', data_folder + \
                                 'modules/' + name + '_destructor.py')
-    
+
         paths_to_copy = yaml_data['paths_to_copy'] if 'paths_to_copy' in yaml_data else [] # a list of relative paths (files or dirs) to copy
         for path_name in paths_to_copy:
             if path_name[0] == '.' or '..' in path_name:
@@ -261,7 +265,7 @@ def main():
             else:
                 print(util.color_str(f'Path is not relative or path references a parent directory! Skipping {path_name}', (255, 0, 0)))
             pass
-    
+
     # Create all shared memory buffers for signals:
     shm_dict = {}
     for name, signal in signals.items():
@@ -272,7 +276,7 @@ def main():
             tmp = mp.shared_memory.SharedMemory(name=name, create=False, size=nbytes)
             tmp.unlink()
             shm_dict[name] = mp.shared_memory.SharedMemory(name=name, create=True, size=nbytes)
-    
+
     # Create communication pipes between processes in the directed graph.
     pipes = {name: {'in': [], 'out': [], 'trigger': None} for name in modules.keys()}
     triggers = {}
@@ -299,7 +303,7 @@ def main():
                 conn1, conn2 = mp.Pipe()
                 pipes[name]['trigger'] = conn1
                 triggers[name] = conn2
-        
+
     def flush_log(lg_queue, lg_list):
         # move all items from lg_queue to lg_list
         if lg_queue is not None:
@@ -307,7 +311,7 @@ def main():
                 line = lg_queue.get()
                 lg_list.append(line)
         return
-        
+
     try:
         # Start the module processes.
         procs = {}
@@ -317,7 +321,7 @@ def main():
             print('main {}\n'.format(name), end='')
             procs[name].start()
             time.sleep(0.01)
-        
+
         # Send an empty string to trigger each triggered process
         for name, trigger in triggers.items():
             print('trigger {}\n'.format(name), end='')
@@ -370,7 +374,7 @@ def main():
         for key, value in shm_dict.items():
             shm_dict[key].close()
             shm_dict[key].unlink()
-        
+
         print('  Exiting main')
         flush_log(log_queue, log_list)
         # Write print output to logfile (if applicable)
