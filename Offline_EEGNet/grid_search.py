@@ -69,18 +69,20 @@ def run_grid_search(base_config_path, output_dir="grid_search_results"):
         # Generate unique model name
         model_name = f"grid_{idx}_w{param_dict['window_length']}_n{param_dict['num_noise']}_f{param_dict['num_folds']}_s{param_dict['stride']}"
 
+        # Compute model_dir before try block
+        model_dir = (
+            config["model_dir"]
+            + model_name
+            + "_"
+            + "_".join(config["data_names"])
+            + "/"
+        )
+
         try:
             # Run pipeline
             pipeline(config, model_name=model_name, train_kf=False)
 
             # Extract results from CSV
-            model_dir = (
-                config["model_dir"]
-                + model_name
-                + "_"
-                + "_".join(config["data_names"])
-                + "/"
-            )
             results_csv = model_dir + "results.csv"
 
             if os.path.exists(results_csv):
