@@ -15,7 +15,7 @@ import shutil
 # Define hyperparameter grid
 PARAM_GRID = {
     "window_length": [125, 150, 200, 250],
-    "num_noise": [2, 4, 8],
+    "num_noise": [4, 6, 8],
     "num_folds": [3, 5, 7],
     "stride": [12, 18],
 }
