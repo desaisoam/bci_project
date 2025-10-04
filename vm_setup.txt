@@ -1,0 +1,31 @@
+# Minimal VM Setup for BCI Training
+
+# 1. Install Python 3.8
+sudo apt-get update
+sudo apt-get install -y python3.8 python3.8-venv python3-pip git
+
+# 2. Clone repo (use your token as password)
+git clone https://github.com/desaisoam/bci_raspy.git
+cd bci_raspy
+
+# 3. Create Python 3.8 virtual environment
+python3.8 -m venv venv
+source venv/bin/activate
+
+# 4. Install MINIMAL packages for training only
+pip install --upgrade pip
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+pip install numpy pandas scipy h5py pyyaml tqdm scikit-learn matplotlib flatten-dict gitpython
+
+# 5. Verify GPU is working
+python -c "import torch; print('GPU Available:', torch.cuda.is_available()); print('GPU Name:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')"
+
+# 6. Run grid search
+cd Offline_EEGNet
+python grid_search.py
+
+# Grid search will take ~3 hours on A100
+# Results saved to: grid_search_results/grid_search_results.csv
+# Only top 5 models will be kept
+
+# 7. IMPORTANT: Stop the VM when done to avoid charges!
