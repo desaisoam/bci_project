@@ -62,7 +62,7 @@ def run_single_experiment(config, param_name, param_value, best_params, idx):
 
     try:
         # Run pipeline
-        pipeline(config, model_name=model_name, train_kf=False)
+        pipeline(config, model_name=model_name, train_kf=True)
 
         # Extract results
         results_csv = model_dir + "results.csv"
@@ -149,10 +149,19 @@ def sequential_search(base_config_path, output_dir="sequential_search_results"):
         print(f"Updated best params: {best_params}")
         print(f"{'=' * 80}\n")
 
+        # Delete non-best models immediately
+        print(f"Cleaning up non-best models for {param_name}...")
+        best_model_dir = best_result["model_dir"]
+        for result in param_results:
+            model_dir = result.get("model_dir", "")
+            if model_dir and model_dir != best_model_dir and os.path.exists(model_dir):
+                print(f"  → Deleting: {os.path.basename(model_dir)}")
+                shutil.rmtree(model_dir)
+
     # Save all results
     results_df = pd.DataFrame(all_results)
     results_csv_path = os.path.join(output_dir, "sequential_search_results.csv")
-    results_df.to_csv(results_csv_path, index=False)
+    results_df.to_csv(results_csv_path, index=True)
 
     # Clean up - keep only models from final optimized run
     print(f"\nCleaning up intermediate models...")

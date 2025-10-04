@@ -82,7 +82,7 @@ def run_grid_search(base_config_path, output_dir="grid_search_results"):
 
         try:
             # Run pipeline
-            pipeline(config, model_name=model_name, train_kf=False)
+            pipeline(config, model_name=model_name, train_kf=True)
 
             # Extract results from CSV
             results_csv = model_dir + "results.csv"
@@ -122,6 +122,34 @@ def run_grid_search(base_config_path, output_dir="grid_search_results"):
             result_entry["error"] = str(e)
             results.append(result_entry)
 
+        # Rolling cleanup: Keep only top K models as we go
+        if len(results) > TOP_K_MODELS:
+            results_sorted = sorted(
+                results, key=lambda x: x["mean_val_acc"], reverse=True
+            )
+            kth_best_acc = results_sorted[TOP_K_MODELS - 1]["mean_val_acc"]
+            current_acc = results[-1]["mean_val_acc"]
+
+            if current_acc < kth_best_acc:
+                print(
+                    f"  → Deleting (below top {TOP_K_MODELS}: {current_acc:.4f} < {kth_best_acc:.4f})"
+                )
+                if os.path.exists(model_dir):
+                    shutil.rmtree(model_dir)
+            else:
+                models_to_keep = set(
+                    [r["model_dir"] for r in results_sorted[:TOP_K_MODELS]]
+                )
+                for result in results:
+                    result_dir = result.get("model_dir", "")
+                    if (
+                        result_dir
+                        and os.path.exists(result_dir)
+                        and result_dir not in models_to_keep
+                    ):
+                        print(f"  → Deleting: {os.path.basename(result_dir)}")
+                        shutil.rmtree(result_dir)
+
         # Clean up memory after each run to prevent memory leak
         gc.collect()
         if torch.cuda.is_available():
@@ -140,17 +168,8 @@ def run_grid_search(base_config_path, output_dir="grid_search_results"):
     # Sort by mean validation accuracy
     results_df_sorted = results_df.sort_values("mean_val_acc", ascending=False)
 
-    # Delete all models except top K
-    print(f"\nCleaning up: keeping only top {TOP_K_MODELS} models...")
-    models_to_keep = set(results_df_sorted.head(TOP_K_MODELS)["model_dir"].tolist())
-
-    for result in results:
-        model_dir = result.get("model_dir", "")
-        if os.path.exists(model_dir) and model_dir not in models_to_keep:
-            print(f"  Deleting: {model_dir}")
-            shutil.rmtree(model_dir)
-
-    print(f"Cleanup complete. Kept {TOP_K_MODELS} best models.")
+    # No cleanup needed - already done during training
+    print(f"\nKept top {TOP_K_MODELS} models (cleaned up during training)")
 
     print(f"\nResults saved to: {results_csv_path}")
     print("\nTop 10 configurations by mean validation accuracy:")
