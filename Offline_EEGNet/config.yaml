@@ -9,13 +9,13 @@ h5_dir: ../data/raspy/preprocessed_data/ # path to store preprocessed data.
 model_arch_dir: ./EEGNet.py
 
 data_names:
-  - exp_2025-10-02_17-52-05
+  - Soam1
 data_kinds:
   - OL
 train_on_server: False # if set to False, please change data_dir, model_dir, h5_dir correspondingly to your local paths.
 device_id:
-  - cpu
-  #- 0
+  #- cpu
+  - 0
 random_seed: ~
 
 # ============================================
