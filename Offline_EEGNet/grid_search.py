@@ -8,6 +8,8 @@ import os
 import sys
 import itertools
 import pandas as pd
+import gc
+import torch
 from shared_utils import utils
 from pipeline_kf_func import pipeline
 import shutil
@@ -119,6 +121,12 @@ def run_grid_search(base_config_path, output_dir="grid_search_results"):
             result_entry["model_dir"] = model_dir
             result_entry["error"] = str(e)
             results.append(result_entry)
+
+        # Clean up memory after each run to prevent memory leak
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
     # Save all results to CSV
     results_df = pd.DataFrame(results)
