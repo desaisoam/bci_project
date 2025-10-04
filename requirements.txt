@@ -1,6 +1,7 @@
 setuptools==65.5.0
 wheel==0.38.4
 absl-py==1.4.0
+brainflow==5.10.1
 appdirs==1.4.4
 cachetools==5.3.1
 certifi==2023.7.22
@@ -118,3 +119,6 @@ urllib3==1.26.16
 wandb==0.15.10
 Werkzeug==2.3.7
 zipp==3.16.2
+seaborn==0.12.2
+pytorch-lightning==2.0.0
+mne==1.5.0
