@@ -16,7 +16,7 @@ data_kinds:
   - OL
 train_on_server: False # if set to False, please change data_dir, model_dir, h5_dir correspondingly to your local paths.
 device_id:
-  - cpu
+  - 0
 random_seed: ~
 
 # ============================================

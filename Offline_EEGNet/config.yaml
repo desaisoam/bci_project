@@ -10,7 +10,9 @@ model_arch_dir: ./EEGNet.py
 
 data_names:
   - Soam1
+  - Soam2
 data_kinds:
+  - OL
   - OL
 train_on_server: False # if set to False, please change data_dir, model_dir, h5_dir correspondingly to your local paths.
 device_id:
