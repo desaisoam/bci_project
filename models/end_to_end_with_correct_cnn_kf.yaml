@@ -1,0 +1,495 @@
+paths_to_copy:
+  - ./main
+  - ./modules/kf_util.py
+
+signals:
+  timer_tick_time_ns:
+    shape: 1
+    dtype: int64
+  decoded_pos:
+    shape: 2
+    dtype: float32
+  target_pos:
+    shape: 2
+    dtype: float32
+  target_size:
+    shape: 2
+    dtype: float32
+  state_task:
+    shape: 1
+    dtype: int8
+  game_state:
+    shape: 1
+    dtype: int8
+  eegbuffersignal:
+    shape: (1250, 17)
+    dtype: float32
+  databuffer:
+    shape: (1250, 17)
+    dtype: float32
+  eegbufferindex:
+    shape: 1
+    dtype: int16
+  v_decoded:
+    shape: 2
+    dtype: float32
+  decoder_output:
+    shape: 5
+    dtype: float32
+  kf_state:
+    shape: (7,)
+    dtype: float32
+  kf_inf_state:
+    shape: (7,)
+    dtype: float32
+  decoder_h:
+    shape: 16
+    dtype: float32
+  kf_R:
+    shape: (7, 7)
+    dtype: float64
+  kf_S:
+    shape: (16, 7)
+    dtype: float64
+  kf_T:
+    shape: (16, 16)
+    dtype: float64
+  kf_Tinv:
+    shape: (16, 16)
+    dtype: float64
+  kf_EBS:
+    shape: 1
+    dtype: float64
+  kf_C:
+    shape: (16, 7)
+    dtype: float64
+  kf_Q:
+    shape: (16, 16)
+    dtype: float64
+  kf_Qinv:
+    shape: (16, 16)
+    dtype: float64
+  kf_S_k:
+    shape: (7, 7)
+    dtype: float64
+  kf_K_k:
+    shape: (7, 16)
+    dtype: float64
+  kf_M1:
+    shape: (7, 7)
+    dtype: float64
+  kf_M2:
+    shape: (7, 16)
+    dtype: float64
+  kf_effective_vel:
+    shape: (2,)
+    dtype: float32
+  kf_ole_rlud:
+    shape: (4,)
+    dtype: float32
+  rluds_output:
+    shape: (5,)
+    dtype: float32
+  kf_update_flag:
+    shape: 1
+    dtype: int8
+  allow_kf_adapt:
+    shape: 1
+    dtype: bool
+  allow_kf_sync:
+    shape: 1
+    dtype: bool
+  shared_last_layer_w:
+    shape: (4, 48)
+    dtype: float32
+  shared_last_layer_b:
+    shape: 4
+    dtype: float32
+  updated_weights_ready:
+    shape: 1
+    dtype: bool
+  reload:
+    shape: 1
+    dtype: bool
+  numEEGSamples:
+    shape: 1
+    dtype: int16
+  totalValidEEGSamples:
+    shape: 1
+    dtype: int64
+  sessionLength:
+    shape: 1
+    dtype: float32
+  activeLength:
+    shape: 1
+    dtype: float32
+  cursorVel:
+    shape: 2
+    dtype: float32
+  ignoreWrongTarget:
+    shape: 1
+    dtype: bool
+  cursorCorrectDir:
+    shape: 1
+    dtype: bool
+  assistValue:
+    shape: 1
+    dtype: float32
+  assistMode:
+    shape: 2
+    dtype: int8
+  softmaxThres:
+    shape: 1
+    dtype: float32
+  holdTimeThres:
+    shape: 1
+    dtype: float32
+  kfCopilotAlpha:
+    shape: 1
+    dtype: float32
+  hitRate:
+    shape: 1
+    dtype: float32
+  missRate:
+    shape: 1
+    dtype: float32
+  timeoutRate:
+    shape: 1
+    dtype: float32
+  trialCount:
+    shape: 1
+    dtype: float32
+  render_angle:
+    shape: 1
+    dtype: float32
+  numCompletedBlocks:
+    shape: 1
+    dtype: int32
+  enableKfSyncInternal:
+    shape: 1
+    dtype: int8
+
+group_params:
+  dt_group:
+    modules:
+      - timer
+      - kf_clda
+      - SJ_4_directions
+    params:
+      dt: 50000
+
+modules:
+  timer:
+    constructor: true
+    destructor: true
+    trigger: true
+    out:
+      - timer_tick_time_ns
+    params:
+      timer_type: pygame  # Use pygame timer for Mac
+      verbose: true
+
+  UpdateEEG:
+    constructor: true
+    destructor: true
+    sync:
+      - timer
+    out:
+      - eegbuffersignal
+      - eegbufferindex
+      - numEEGSamples
+      - totalValidEEGSamples
+    trigger: false
+    params:
+      serial_port: /dev/cu.usbserial-DP05I34K
+      pkg_expected_step: 2
+      openbci_commands:
+        - x1040010X
+        - x2040010X
+        - x3040010X
+        - x4040010X
+        - x5040010X
+        - x6040010X
+        - x7040010X
+        - x8040010X
+        - xQ040010X
+        - xW040010X
+        - xE040010X
+        - xR040010X
+        - xT040010X
+        - xY040010X
+        - xU040010X
+        - xI040010X
+      
+
+  filterEEG:
+    constructor: true
+    destructor: false
+    sync:
+      - UpdateEEG
+    in:
+      - eegbuffersignal
+      - eegbufferindex
+      - numEEGSamples
+      - totalValidEEGSamples
+    out:
+      - databuffer
+
+  decoder_hidden:
+    constructor: true
+    sync:
+      - filterEEG
+    in:
+      - eegbuffersignal
+      - databuffer
+      - eegbufferindex
+      - state_task
+      - reload
+      - shared_last_layer_w
+      - shared_last_layer_b
+      - updated_weights_ready
+    out:
+      - decoder_output
+      - decoder_h
+      - reload
+    params:
+      # YOUR TRAINED MODEL
+      path: data/raspy/trained_models/seq_0_window_length125_w125_n4_f5_s12_Soam1_Soam2
+      fold: 0
+      data_preprocessor:
+        online_status: online
+        normalizer_type: welfords
+
+  kf_clda:
+    constructor: true
+    destructor: true
+    sync:
+      - decoder_hidden
+    in:
+      - decoder_h
+      - state_task
+      - decoded_pos
+      - target_pos
+      - decoder_output
+      - allow_kf_adapt
+      - allow_kf_sync
+    out:
+      - kf_state
+      - kf_inf_state
+      - rluds_output
+      - kf_update_flag
+      - kf_R
+      - kf_S
+      - kf_T
+      - kf_Tinv
+      - kf_EBS
+      - kf_C
+      - kf_Q
+      - kf_Qinv
+      - kf_S_k
+      - kf_K_k
+      - kf_M1
+      - kf_M2
+      - kf_effective_vel
+      - kf_ole_rlud
+    params:
+      init_EBS_seconds: 180  # Start fresh
+      half_life: 2000.0
+      # YOUR TRAINED KALMAN FILTER
+      kf_init_path: data/raspy/trained_models/seq_0_window_length125_w125_n4_f5_s12_Soam1_Soam2/0_kf.npz
+      RLUDs_idx:
+        - 1
+        - 0
+        - 2
+        - 3
+      continuous_update: false
+      A_gain: 0.5
+      inf_state_delay: 0.0
+      refit_mode: split
+
+  SJ_4_directions:
+    name: kf_4_directions
+    constructor: true
+    destructor: true
+    sync:
+      - kf_clda
+    in:
+      - eegbufferindex
+      - state_task
+      - decoder_output
+      - kf_state
+    out:
+      - decoded_pos
+      - target_pos
+      - target_size
+      - game_state
+      - allow_kf_adapt
+      - allow_kf_sync
+      - kf_ole_rlud
+      - sessionLength
+      - activeLength
+      - cursorVel
+      - ignoreWrongTarget
+      - cursorCorrectDir
+      - assistValue
+      - assistMode
+      - softmaxThres
+      - holdTimeThres
+      - kfCopilotAlpha
+      - hitRate
+      - missRate
+      - timeoutRate
+      - trialCount
+      - render_angle
+      - numCompletedBlocks
+      - enableKfSyncInternal
+    params:
+      sessionLength: 300  # 5 minutes for testing
+      syncLength: 300
+      waitIntegerBlocks: true
+      fullScreen: false
+      screenSize:
+        - 700
+        - 700
+      objScale: 0.001
+      cursorRadius: 10
+      cursorVel:
+        - 0.03
+        - 0.03
+      ignoreWrongTarget: false
+      cursorCorrectDir: false
+      useRandomTargetPos: false
+      centerIn: true
+      enforceCenter: reset
+      resetCursorPos: false
+      randomTargetPosRadius: -1
+      styleChange: true
+      styleChangeBallSize: 1.0
+      styleChangeCursorSize:
+        - 0.1
+        - 0.1
+      targetWrongColor:
+        - 60
+        - 60
+        - 60
+      useCircleTargets: true
+      # 8 directional targets (matching copilot training)
+      targetsInfo:
+        left:
+          - - -0.7
+            - 0
+          - - 0.2
+            - 0.2
+        right:
+          - - 0.7
+            - 0
+          - - 0.2
+            - 0.2
+        up:
+          - - 0
+            - 0.7
+          - - 0.2
+            - 0.2
+        down:
+          - - 0
+            - -0.7
+          - - 0.2
+            - 0.2
+        LU:
+          - - -0.495
+            - 0.495
+          - - 0.2
+            - 0.2
+        LD:
+          - - -0.495
+            - -0.495
+          - - 0.2
+            - 0.2
+        RU:
+          - - 0.495
+            - 0.495
+          - - 0.2
+            - 0.2
+        RD:
+          - - 0.495
+            - -0.495
+          - - 0.2
+            - 0.2
+      defaultTargetSize:
+        - 0.2
+        - 0.2
+      target2state_task:
+        left: 0
+        right: 1
+        up: 2
+        down: 3
+        still: 4
+        LU: 5
+        LD: 6
+        RU: 7
+        RD: 8
+        null: -1
+      decodedVel:
+        0:
+          - -1.0
+          - 0
+        1:
+          - 1.0
+          - 0
+        2:
+          - 0.0
+          - 1
+        3:
+          - 0.0
+          - -1
+        4:
+          - 0.0
+          - 0
+      holdTimeThres: 2.0  # Match copilot training
+      graceTimeThres: 0.0
+      softmaxThres: 0.5
+      assist: 0.0
+      assistMode: n2
+      inactiveLength: 0
+      delayedLength: 0
+      activeLength: 24  # 24 seconds per trial
+      calibrationLength: 5
+      skipFirstNtrials: 4
+      numInitialEvaluationBlocks: 0  # No evaluation phase
+      showTextMetrics: null
+      showCountDown: true
+      softmaxStyle: normal
+      showSoftmax: false
+      showHeatmap: false
+      showStats: true  # Show performance stats
+      showColorCursor: true
+      showPredictedTarget: false
+      showAllTarget: true  # Show all targets for testing
+      hideCom: true
+      hideMass: false  # Show mass for copilot visualization
+      yamlName: models/end_to_end_with_dummy_cnn_kf.yaml
+      
+      # ========== COPILOT CONFIGURATION ==========
+      # Choose ONE of these copilot models:
+      
+      # Option 1: LSTM Copilot (RecurrentPPO) - Recommended for paper
+      copilot_path: SJtools/copilot/models/keep/charge/T8B_LSTM2_truedecay/best_model
+      
+      # Option 2: Feedforward Copilot (PPO) - Also works well
+      # copilot_path: SJtools/copilot/models/keep/charge/T8B_temperature1/best_model
+      
+      # Copilot uses KF state as input (not raw decoder output)
+      copilot_kf_state: true
+      
+      # Control blend: 0.0 = full copilot, 1.0 = full KF
+      kfCopilotAlpha: 0.0  # Start with full copilot control
+      
+      # KF adaptation settings
+      enableKfSync: false  # Don't sync KF every trial for copilot testing
+      enableKfAdapt: true  # Allow KF to adapt
+      enableKfAdaptDelay: 1.0
+      
+      dt: 50000
+
+std updated: 5.0
+
